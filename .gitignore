@@ -151,6 +151,23 @@ config*.ini
 ./config.ini
 ./chaoxing.log
 ./cookies.txt
+cache.json
+
+# Editor
 .idea/
 .vscode/
-cache.json
+
+# Node / frontend
+node_modules/
+chaoxing-desktop/node_modules/
+chaoxing-desktop/dist/
+
+# Tauri / Rust build artifacts
+chaoxing-desktop/src-tauri/target/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude

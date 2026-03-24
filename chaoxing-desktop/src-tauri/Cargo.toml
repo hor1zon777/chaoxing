@@ -1,0 +1,37 @@
+[package]
+name = "chaoxing-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "chaoxing_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["cookies", "json", "multipart"] }
+reqwest_cookie_store = "0.8"
+scraper = "0.22"
+regex = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+md-5 = "0.10"
+aes = "0.8"
+cbc = "0.1"
+base64 = "0.22"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+ttf-parser = "0.25"
+configparser = "3"
+url = "2"
+cookie_store = "0.21"
