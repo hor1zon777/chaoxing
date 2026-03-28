@@ -3,6 +3,8 @@
 //! 对应 Python process_chapter()
 //! 获取章节任务列表并顺序处理每个任务点
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use rand::Rng;
@@ -10,33 +12,32 @@ use rand::Rng;
 use crate::api::client::HttpClient;
 use crate::api::{course_card, empty_page};
 use crate::models::chapter::ChapterPoint;
+use crate::models::course::CoursePointSelection;
 use crate::models::events::TaskEvent;
+use crate::models::video::StudyResult;
 use crate::task::job::process_job;
 use crate::tiku::TikuManager;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChapterResult {
     Success,
     Error,
     NotOpen,
+    Cancelled,
 }
 
 /// 处理单个章节
-///
-/// 流程：
-/// 1. 检查是否已完成
-/// 2. 获取任务列表
-/// 3. 空任务列表时发送空页面请求
-/// 4. 顺序处理每个任务点
 pub async fn process_chapter(
     client: &HttpClient,
     course_id: &str,
     clazz_id: &str,
     cpi: &str,
     point: &ChapterPoint,
+    point_selection: Option<&CoursePointSelection>,
     speed: f64,
     tiku: Option<&TikuManager>,
     event_tx: Option<&tokio::sync::mpsc::UnboundedSender<TaskEvent>>,
+    is_running: &Arc<AtomicBool>,
+    is_paused: &Arc<AtomicBool>,
 ) -> ChapterResult {
     tracing::info!("当前章节: {}", point.title);
 
@@ -45,11 +46,9 @@ pub async fn process_chapter(
         return ChapterResult::Success;
     }
 
-    // 随机延迟，模拟人类操作
     let delay = rand::thread_rng().gen_range(0.0..0.2);
     tokio::time::sleep(Duration::from_secs_f64(delay)).await;
 
-    // 获取任务列表
     let (jobs, job_info) =
         match course_card::get_job_list(client, course_id, clazz_id, &point.id, cpi).await {
             Ok(r) => r,
@@ -63,20 +62,54 @@ pub async fn process_chapter(
         return ChapterResult::NotOpen;
     }
 
-    if jobs.is_empty() {
-        // 空页面任务
+    let selected_job_ids = point_selection
+        .map(|selection| selection.selected_job_ids.as_slice())
+        .unwrap_or(&[]);
+    let filtered_jobs = if selected_job_ids.is_empty() {
+        jobs
+    } else {
+        jobs.into_iter()
+            .filter(|job| {
+                !job.is_completed && selected_job_ids.iter().any(|job_id| job_id == &job.jobid)
+            })
+            .collect::<Vec<_>>()
+    };
+
+    if filtered_jobs.is_empty() {
         let _ = empty_page::study_emptypage(client, course_id, clazz_id, &point.id, cpi).await;
+        return ChapterResult::Success;
     }
 
-    // 顺序处理所有任务点
-    // 注意：对于少量任务点（通常 1-3 个），顺序执行足够
-    for job in &jobs {
+    for job in &filtered_jobs {
+        if !is_running.load(Ordering::SeqCst) {
+            tracing::info!("任务已取消，停止处理章节: {}", point.title);
+            return ChapterResult::Cancelled;
+        }
+
         let result = process_job(
-            client, course_id, clazz_id, cpi, job, &job_info, speed, tiku, event_tx,
+            client,
+            course_id,
+            clazz_id,
+            cpi,
+            job,
+            &job_info,
+            speed,
+            tiku,
+            event_tx,
+            is_running,
+            is_paused,
         )
         .await;
 
+        if !is_running.load(Ordering::SeqCst) {
+            tracing::info!("任务已取消，停止处理章节: {}", point.title);
+            return ChapterResult::Cancelled;
+        }
+
         match result {
+            Ok(StudyResult::Cancelled) => {
+                return ChapterResult::Cancelled;
+            }
             Ok(r) if r.is_failure() => {
                 tracing::warn!("任务失败: {}", job.name);
                 return ChapterResult::Error;

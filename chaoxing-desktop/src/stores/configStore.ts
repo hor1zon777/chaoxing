@@ -64,7 +64,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       await invoke("save_config", { config });
       set({ config, loading: false });
     } catch (e) {
-      set({ error: String(e), loading: false });
+      const errorMessage = String(e);
+      set({ error: errorMessage, loading: false });
+      throw new Error(errorMessage);
     }
   },
 
@@ -79,7 +81,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       const config = await invoke<AppConfig>("import_ini", { path });
       set({ config, loading: false });
     } catch (e) {
-      set({ error: String(e), loading: false });
+      const errorMessage = String(e);
+      set({ error: errorMessage, loading: false });
+      throw new Error(errorMessage);
     }
   },
 }));

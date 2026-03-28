@@ -2,6 +2,8 @@
 //!
 //! 对应 Python: api/live_process.py (LiveProcessor)
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -23,6 +25,8 @@ pub async fn run_live(
     knowledge_id: &str,
     speed: f64,
     event_tx: Option<&mpsc::UnboundedSender<TaskEvent>>,
+    is_running: &Arc<AtomicBool>,
+    is_paused: &Arc<AtomicBool>,
 ) -> Result<StudyResult, AppError> {
     let user_id = client.get_uid().unwrap_or_default();
     let live_name = job
@@ -56,6 +60,19 @@ pub async fn run_live(
 
     // 循环提交（每分钟一次）
     for i in 0..total_minutes {
+        if !is_running.load(Ordering::SeqCst) {
+            tracing::info!("直播任务已取消: {}", live_name);
+            return Ok(StudyResult::Cancelled);
+        }
+
+        while is_paused.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            if !is_running.load(Ordering::SeqCst) {
+                tracing::info!("直播任务已取消: {}", live_name);
+                return Ok(StudyResult::Cancelled);
+            }
+        }
+
         tracing::info!(
             "直播 '{}' 已观看 {}/{} 分钟",
             live_name,

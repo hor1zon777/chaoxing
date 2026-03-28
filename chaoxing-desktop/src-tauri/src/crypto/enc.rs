@@ -1,4 +1,4 @@
-use md5::{Digest, Md5};
+use md5_digest::{Digest, Md5};
 
 /// 生成视频进度上报的 enc 签名
 /// 对应 Python: Chaoxing.get_enc()

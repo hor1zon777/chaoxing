@@ -16,6 +16,9 @@ use std::time::Duration;
 use rand::Rng;
 use regex::Regex;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use crate::api::client::HttpClient;
 use crate::crypto::enc::get_video_enc;
 use crate::error::AppError;
@@ -90,71 +93,90 @@ async fn video_progress_log(
 ) -> Result<(bool, u16), AppError> {
     client.video_rate_limiter.limit_rate().await;
 
-    // 随机延迟 0-2 秒，模拟人类行为
     let delay = rand::thread_rng().gen_range(0.0..2.0);
     tokio::time::sleep(Duration::from_secs_f64(delay)).await;
 
     let uid = client.get_uid().unwrap_or_default();
     let enc = get_video_enc(clazz_id, &job.jobid, &job.objectid, playing_time, duration, &uid);
     let referer = media_referer(media_type);
-    let rt = resolve_rt(job);
-
+    let resolved_rt = resolve_rt(job);
     let url = format!(
         "https://mooc1.chaoxing.com/mooc-ans/multimedia/log/a/{}/{}",
         cpi, dtoken
     );
 
-    let mut params = vec![
-        ("clazzId", clazz_id.to_string()),
-        ("playingTime", playing_time.to_string()),
-        ("duration", duration.to_string()),
-        ("clipTime", format!("0_{}", duration)),
-        ("objectId", job.objectid.clone()),
-        ("otherInfo", job.otherinfo.clone()),
-        ("courseId", course_id.to_string()),
-        ("jobid", job.jobid.clone()),
-        ("userid", uid),
-        ("isdrag", "3".to_string()),
-        ("view", "pc".to_string()),
-        ("enc", enc),
-        ("dtype", media_type.to_string()),
-    ];
+    let build_params = |rt: Option<&str>| {
+        let mut params = vec![
+            ("clazzId", clazz_id.to_string()),
+            ("playingTime", playing_time.to_string()),
+            ("duration", duration.to_string()),
+            ("clipTime", format!("0_{}", duration)),
+            ("objectId", job.objectid.clone()),
+            ("otherInfo", job.otherinfo.clone()),
+            ("courseId", course_id.to_string()),
+            ("jobid", job.jobid.clone()),
+            ("userid", uid.clone()),
+            ("isdrag", "3".to_string()),
+            ("view", "pc".to_string()),
+            ("enc", enc.clone()),
+            ("dtype", media_type.to_string()),
+        ];
 
-    if !job.video_face_capture_enc.is_empty() {
-        params.push(("videoFaceCaptureEnc", job.video_face_capture_enc.clone()));
-    }
-    if !job.att_duration.is_empty() {
-        params.push(("attDuration", job.att_duration.clone()));
-    }
-    if !job.att_duration_enc.is_empty() {
-        params.push(("attDurationEnc", job.att_duration_enc.clone()));
+        if !job.video_face_capture_enc.is_empty() {
+            params.push(("videoFaceCaptureEnc", job.video_face_capture_enc.clone()));
+        }
+        if !job.att_duration.is_empty() {
+            params.push(("attDuration", job.att_duration.clone()));
+        }
+        if !job.att_duration_enc.is_empty() {
+            params.push(("attDurationEnc", job.att_duration_enc.clone()));
+        }
+        if let Some(value) = rt {
+            params.push(("rt", value.to_string()));
+            params.push(("_t", timestamp_millis()));
+        }
+
+        params
+    };
+
+    let try_with_rt = async |rt: Option<&str>| -> Result<(bool, u16), AppError> {
+        let resp = client
+            .client
+            .get(&url)
+            .query(&build_params(rt))
+            .header("Referer", referer)
+            .send()
+            .await?;
+
+        let status = resp.status().as_u16();
+        if status == 200 {
+            let json: serde_json::Value = resp.json().await?;
+            let is_passed = json["isPassed"].as_bool().unwrap_or(false);
+            Ok((is_passed, 200))
+        } else if status == 403 {
+            tracing::warn!("视频进度上报返回 403");
+            Ok((false, 403))
+        } else {
+            tracing::error!("视频进度上报未知错误: {}", status);
+            Ok((false, status))
+        }
+    };
+
+    if !resolved_rt.is_empty() {
+        return try_with_rt(Some(&resolved_rt)).await;
     }
 
-    if !rt.is_empty() {
-        params.push(("rt", rt));
-        params.push(("_t", timestamp_millis()));
+    for fallback_rt in ["0.9", "1"] {
+        let result = try_with_rt(Some(fallback_rt)).await?;
+        if result.1 == 200 {
+            return Ok(result);
+        }
+        if result.1 != 403 {
+            return Ok(result);
+        }
     }
 
-    let resp = client
-        .client
-        .get(&url)
-        .query(&params)
-        .header("Referer", referer)
-        .send()
-        .await?;
-
-    let status = resp.status().as_u16();
-    if status == 200 {
-        let json: serde_json::Value = resp.json().await?;
-        let is_passed = json["isPassed"].as_bool().unwrap_or(false);
-        Ok((is_passed, 200))
-    } else if status == 403 {
-        tracing::warn!("视频进度上报返回 403");
-        Ok((false, 403))
-    } else {
-        tracing::error!("视频进度上报未知错误: {}", status);
-        Ok((false, status))
-    }
+    Ok((false, 403))
 }
 
 /// 获取视频状态信息
@@ -214,6 +236,8 @@ pub async fn study_video(
     speed: f64,
     media_type: &str,
     event_tx: Option<&tokio::sync::mpsc::UnboundedSender<TaskEvent>>,
+    is_running: &Arc<AtomicBool>,
+    is_paused: &Arc<AtomicBool>,
 ) -> Result<StudyResult, AppError> {
     let fid = client.get_fid().unwrap_or_default();
     let referer = media_referer(media_type);
@@ -259,8 +283,17 @@ pub async fn study_video(
     let mut current_dtoken = dtoken;
 
     loop {
-        if play_time >= duration {
-            break;
+        if !is_running.load(Ordering::SeqCst) {
+            tracing::info!("视频任务已取消: {}", job.name);
+            return Ok(StudyResult::Cancelled);
+        }
+
+        while is_paused.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            if !is_running.load(Ordering::SeqCst) {
+                tracing::info!("视频任务已取消: {}", job.name);
+                return Ok(StudyResult::Cancelled);
+            }
         }
 
         // 到达上报间隔
@@ -310,26 +343,21 @@ pub async fn study_video(
             last_log_time = play_time;
         }
 
-        // 固定步进推进播放时间（与 Python 一致）
-        // 每次循环推进 LOOP_INTERVAL * speed 秒，不依赖真实时间测量，
-        // 避免 video_progress_log 中的网络等待时间被计入导致进度跳动
-        play_time = ((play_time as f64) + LOOP_INTERVAL * speed)
-            .min(duration as f64) as u64;
+        if play_time < duration {
+            play_time = ((play_time as f64) + LOOP_INTERVAL * speed)
+                .min(duration as f64) as u64;
 
-        // 推送进度事件
-        if let Some(tx) = event_tx {
-            let _ = tx.send(TaskEvent::VideoProgress {
-                course_id: course_id.to_string(),
-                job_id: job.jobid.clone(),
-                job_name: job.name.clone(),
-                current_time: play_time,
-                total_duration: duration,
-            });
+            if let Some(tx) = event_tx {
+                let _ = tx.send(TaskEvent::VideoProgress {
+                    course_id: course_id.to_string(),
+                    job_id: job.jobid.clone(),
+                    job_name: job.name.clone(),
+                    current_time: play_time,
+                    total_duration: duration,
+                });
+            }
         }
 
         tokio::time::sleep(Duration::from_secs_f64(LOOP_INTERVAL)).await;
     }
-
-    tracing::info!("任务完成: {}", job.name);
-    Ok(StudyResult::Success)
 }

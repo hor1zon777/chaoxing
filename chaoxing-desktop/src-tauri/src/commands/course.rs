@@ -1,10 +1,10 @@
 use tauri::State;
 
-use crate::api::course;
+use crate::api::{course, course_card, course_point};
 use crate::error::AppError;
 use crate::models::chapter::ChapterTree;
-use crate::models::course::Course;
-use crate::parser::course_point::parse_course_point;
+use crate::models::course::{ChapterSelectionPoint, Course, CourseJob, CourseSelectionTree};
+use crate::models::job::Job;
 use crate::state::AppState;
 
 /// 获取课程列表
@@ -25,11 +25,53 @@ pub async fn get_chapter_tree(
 ) -> Result<ChapterTree, AppError> {
     let lock = state.client.read().await;
     let client = lock.as_ref().ok_or(AppError::Unauthorized)?;
-    let url = format!(
-        "https://mooc2-ans.chaoxing.com/mooc2-ans/mycourse/studentcourse?courseid={}&clazzid={}&cpi={}&ut=s",
-        course_id, clazz_id, cpi
-    );
-    let resp = client.client.get(&url).send().await?;
-    let html = resp.text().await?;
-    parse_course_point(&html)
+    course_point::get_course_point(client, &course_id, &clazz_id, &cpi).await
+}
+
+/// 获取课程选择树（章节 + 任务点）
+#[tauri::command]
+pub async fn get_course_selection_tree(
+    state: State<'_, AppState>,
+    course_id: String,
+    clazz_id: String,
+    cpi: String,
+) -> Result<CourseSelectionTree, AppError> {
+    let lock = state.client.read().await;
+    let client = lock.as_ref().ok_or(AppError::Unauthorized)?;
+
+    let chapter_tree = course_point::get_course_point(client, &course_id, &clazz_id, &cpi).await?;
+    let mut points = Vec::with_capacity(chapter_tree.points.len());
+
+    for point in chapter_tree.points {
+        let (jobs, _) = course_card::get_job_list(client, &course_id, &clazz_id, &point.id, &cpi).await?;
+        points.push(ChapterSelectionPoint {
+            id: point.id,
+            title: point.title,
+            job_count: jobs.len() as u32,
+            has_finished: point.has_finished,
+            need_unlock: point.need_unlock,
+            jobs: convert_jobs(jobs),
+        });
+    }
+
+    Ok(CourseSelectionTree {
+        has_locked: chapter_tree.has_locked,
+        points,
+    })
+}
+
+fn convert_jobs(jobs: Vec<Job>) -> Vec<CourseJob> {
+    jobs.into_iter()
+        .map(|job| CourseJob {
+            id: job.jobid,
+            name: if job.name.is_empty() {
+                format!("{}任务", job.job_type.label())
+            } else {
+                job.name
+            },
+            type_label: job.job_type.label().to_string(),
+            job_type: job.job_type,
+            is_completed: job.is_completed,
+        })
+        .collect()
 }

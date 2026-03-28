@@ -38,6 +38,8 @@ interface TaskState {
   setPaused: (paused: boolean) => void;
   /** 重置全部状态 */
   reset: () => void;
+  /** 彻底清空任务状态 */
+  clearAll: () => void;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -246,7 +248,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   clearLogs: () => set({ logs: [] }),
 
-  setRunning: (running) => set({ isRunning: running }),
+  setRunning: (running) =>
+    set((state) => ({
+      isRunning: running,
+      videoProgress: running ? state.videoProgress : {},
+    })),
 
   setPaused: (paused) => set({ isPaused: paused }),
 
@@ -257,5 +263,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       courseProgress: {},
       videoProgress: {},
       logs: [],
+    }),
+
+  clearAll: () =>
+    set({
+      isRunning: false,
+      isPaused: false,
+      courseProgress: {},
+      videoProgress: {},
+      logs: [],
+      logFilter: "all",
     }),
 }));

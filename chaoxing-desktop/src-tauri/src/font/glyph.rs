@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use md5::{Digest, Md5};
+use md5_digest::{Digest, Md5};
 use ttf_parser::Face;
 
 // ====== glyf 表 flag 位定义 ======

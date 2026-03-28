@@ -3,6 +3,9 @@
 //! 对应 Python process_job()
 //! 根据 JobType 分发到对应的处理函数
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use crate::api::client::HttpClient;
 use crate::api::{document, read, video, work};
 use crate::error::AppError;
@@ -30,19 +33,41 @@ pub async fn process_job(
     speed: f64,
     tiku: Option<&TikuManager>,
     event_tx: Option<&tokio::sync::mpsc::UnboundedSender<TaskEvent>>,
+    is_running: &Arc<AtomicBool>,
+    is_paused: &Arc<AtomicBool>,
 ) -> Result<StudyResult, AppError> {
     match job.job_type {
         JobType::Video => {
             tracing::info!("识别到视频任务: {}", job.name);
             let result = video::study_video(
-                client, course_id, clazz_id, cpi, job, job_info, speed, "Video", event_tx,
+                client,
+                course_id,
+                clazz_id,
+                cpi,
+                job,
+                job_info,
+                speed,
+                "Video",
+                event_tx,
+                is_running,
+                is_paused,
             )
             .await?;
 
             if result.is_failure() {
                 tracing::warn!("视频模式失败，尝试音频模式: {}", job.name);
                 return video::study_video(
-                    client, course_id, clazz_id, cpi, job, job_info, speed, "Audio", event_tx,
+                    client,
+                    course_id,
+                    clazz_id,
+                    cpi,
+                    job,
+                    job_info,
+                    speed,
+                    "Audio",
+                    event_tx,
+                    is_running,
+                    is_paused,
                 )
                 .await;
             }
@@ -79,6 +104,8 @@ pub async fn process_job(
                 &job_info.knowledgeid,
                 speed,
                 event_tx,
+                is_running,
+                is_paused,
             )
             .await
         }

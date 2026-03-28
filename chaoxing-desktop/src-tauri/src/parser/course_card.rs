@@ -91,14 +91,11 @@ fn process_attachment_cards(cards: &[Value]) -> Vec<Job> {
     let mut job_list = Vec::new();
 
     for card in cards {
-        // 跳过已通过的任务
-        if card.get("isPassed").and_then(|v| v.as_bool()).unwrap_or(false) {
-            continue;
-        }
+        let is_completed = card.get("isPassed").and_then(|v| v.as_bool()).unwrap_or(false);
 
         // 处理无 job 字段的特殊任务
         if card.get("job").is_none() || card.get("job") == Some(&Value::Null) {
-            if let Some(read_job) = process_read_task(card) {
+            if let Some(read_job) = process_read_task(card, is_completed) {
                 job_list.push(read_job);
             }
             continue;
@@ -130,17 +127,17 @@ fn process_attachment_cards(cards: &[Value]) -> Vec<Job> {
             || property.get("vdoid").is_some_and(|v| !v.is_null());
 
         if is_live {
-            if let Some(job) = process_live_task(card, &other_info) {
+            if let Some(job) = process_live_task(card, &other_info, is_completed) {
                 job_list.push(job);
             }
         } else if card_type == "video" {
-            if let Some(job) = process_video_task(card, &other_info) {
+            if let Some(job) = process_video_task(card, &other_info, is_completed) {
                 job_list.push(job);
             }
         } else if card_type == "document" {
-            job_list.push(process_document_task(card, &other_info));
+            job_list.push(process_document_task(card, &other_info, is_completed));
         } else if card_type == "workid" {
-            job_list.push(process_work_task(card, &other_info));
+            job_list.push(process_work_task(card, &other_info, is_completed));
         }
         // 未知类型静默跳过
     }
@@ -149,21 +146,19 @@ fn process_attachment_cards(cards: &[Value]) -> Vec<Job> {
 }
 
 /// 处理阅读类型任务
-fn process_read_task(card: &Value) -> Option<Job> {
+fn process_read_task(card: &Value, is_completed: bool) -> Option<Job> {
     let card_type = json_str(card, "type");
     if card_type != "read" {
         return None;
     }
 
     let property = card.get("property").cloned().unwrap_or(Value::Null);
-    // 已阅读的跳过
-    if property.get("read").and_then(|v| v.as_bool()).unwrap_or(false) {
-        return None;
-    }
+    let read_completed = property.get("read").and_then(|v| v.as_bool()).unwrap_or(false);
 
     Some(Job {
         job_type: JobType::Read,
         jobid: json_str(card, "jobid"),
+        is_completed: is_completed || read_completed,
         name: json_str(&property, "title"),
         otherinfo: json_str(card, "otherInfo"),
         mid: json_str(card, "mid"),
@@ -183,7 +178,7 @@ fn process_read_task(card: &Value) -> Option<Job> {
 }
 
 /// 处理直播类型任务
-fn process_live_task(card: &Value, other_info: &str) -> Option<Job> {
+fn process_live_task(card: &Value, other_info: &str, is_completed: bool) -> Option<Job> {
     let property = card.get("property").cloned().unwrap_or(Value::Null);
     let prop_map = value_to_map(&property);
 
@@ -202,6 +197,7 @@ fn process_live_task(card: &Value, other_info: &str) -> Option<Job> {
     Some(Job {
         job_type: JobType::Live,
         jobid,
+        is_completed,
         name,
         otherinfo: other_info.to_string(),
         mid: json_str(card, "mid"),
@@ -224,7 +220,7 @@ fn process_live_task(card: &Value, other_info: &str) -> Option<Job> {
 }
 
 /// 处理视频类型任务
-fn process_video_task(card: &Value, other_info: &str) -> Option<Job> {
+fn process_video_task(card: &Value, other_info: &str, is_completed: bool) -> Option<Job> {
     // mid 是必须字段，如果不存在则跳过（转码失败的视频）
     let mid = json_str(card, "mid");
     if mid.is_empty() {
@@ -236,6 +232,7 @@ fn process_video_task(card: &Value, other_info: &str) -> Option<Job> {
     Some(Job {
         job_type: JobType::Video,
         jobid: json_str(card, "jobid"),
+        is_completed,
         name: json_str(&property, "name"),
         otherinfo: other_info.to_string(),
         mid,
@@ -255,12 +252,13 @@ fn process_video_task(card: &Value, other_info: &str) -> Option<Job> {
 }
 
 /// 处理文档类型任务
-fn process_document_task(card: &Value, other_info: &str) -> Job {
+fn process_document_task(card: &Value, other_info: &str, is_completed: bool) -> Job {
     let property = card.get("property").cloned().unwrap_or(Value::Null);
 
     Job {
         job_type: JobType::Document,
         jobid: json_str(card, "jobid"),
+        is_completed,
         name: String::new(),
         otherinfo: other_info.to_string(),
         mid: json_str(card, "mid"),
@@ -280,10 +278,11 @@ fn process_document_task(card: &Value, other_info: &str) -> Job {
 }
 
 /// 处理作业类型任务
-fn process_work_task(card: &Value, other_info: &str) -> Job {
+fn process_work_task(card: &Value, other_info: &str, is_completed: bool) -> Job {
     Job {
         job_type: JobType::Work,
         jobid: json_str(card, "jobid"),
+        is_completed,
         name: String::new(),
         otherinfo: other_info.to_string(),
         mid: json_str(card, "mid"),
@@ -375,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_passed_task() {
+    fn test_keep_passed_task_with_completed_flag() {
         let html = r#"
         <script>
         mArg = {"attachments":[{"type":"video","jobid":"j1","mid":"m1","job":true,"isPassed":true,"property":{"name":"已完成"}}],"defaults":{}};
@@ -383,7 +382,8 @@ mod tests {
         "#;
 
         let (jobs, _) = parse_course_card(html).unwrap();
-        assert!(jobs.is_empty());
+        assert_eq!(jobs.len(), 1);
+        assert!(jobs[0].is_completed);
     }
 
     #[test]
@@ -447,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_already_read() {
+    fn test_keep_already_read_with_completed_flag() {
         let html = r#"
         <script>
         mArg = {"attachments":[{"type":"read","jobid":"r001","mid":"m001","property":{"title":"已读","read":true}}],"defaults":{}};
@@ -455,6 +455,8 @@ mod tests {
         "#;
 
         let (jobs, _) = parse_course_card(html).unwrap();
-        assert!(jobs.is_empty());
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].job_type, JobType::Read);
+        assert!(jobs[0].is_completed);
     }
 }

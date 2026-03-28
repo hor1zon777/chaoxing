@@ -7,6 +7,7 @@ pub enum StudyResult {
     Forbidden,
     Error,
     Timeout,
+    Cancelled,
 }
 
 impl StudyResult {

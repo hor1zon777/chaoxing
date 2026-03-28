@@ -2,9 +2,12 @@ use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::Client;
 use std::sync::Arc;
 
+use url::Url;
+
 use cookie_store::CookieStore;
 use reqwest_cookie_store::CookieStoreMutex;
 
+use crate::models::account::StoredCookie;
 use crate::utils::rate_limiter::RateLimiter;
 
 const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36";
@@ -70,5 +73,46 @@ impl HttpClient {
     /// 获取 fid
     pub fn get_fid(&self) -> Option<String> {
         self.get_cookie("fid", "chaoxing.com")
+    }
+
+    pub fn export_cookies(&self) -> Vec<StoredCookie> {
+        let store = self.cookie_store.lock().unwrap();
+        store
+            .iter_unexpired()
+            .map(|cookie| StoredCookie {
+                name: cookie.name().to_string(),
+                value: cookie.value().to_string(),
+                domain: cookie.domain().unwrap_or(".chaoxing.com").to_string(),
+                path: cookie.path().unwrap_or("/").to_string(),
+            })
+            .collect()
+    }
+
+    pub fn import_cookies(&self, cookies: &[StoredCookie]) -> Result<(), String> {
+        let mut store = self.cookie_store.lock().unwrap();
+        for cookie in cookies {
+            let normalized_domain = if cookie.domain.is_empty() {
+                ".chaoxing.com".to_string()
+            } else {
+                cookie.domain.clone()
+            };
+            let normalized_path = if cookie.path.is_empty() {
+                "/".to_string()
+            } else {
+                cookie.path.clone()
+            };
+            let host = normalized_domain.trim_start_matches('.');
+            let url: Url = format!("https://{}{}", host, normalized_path)
+                .parse()
+                .map_err(|e| format!("URL 解析失败: {}", e))?;
+            let set_cookie = format!(
+                "{}={}; Domain={}; Path={}",
+                cookie.name, cookie.value, normalized_domain, normalized_path
+            );
+            if let Ok(parsed) = cookie_store::RawCookie::parse(set_cookie) {
+                let _ = store.insert_raw(&parsed, &url);
+            }
+        }
+        Ok(())
     }
 }

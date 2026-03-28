@@ -12,12 +12,26 @@ pub enum JobType {
     Work,
 }
 
+impl JobType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Video => "视频",
+            Self::Document => "文档",
+            Self::Read => "阅读",
+            Self::Live => "直播",
+            Self::Work => "作业",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
     #[serde(rename = "type")]
     pub job_type: JobType,
     pub jobid: String,
+    #[serde(default)]
+    pub is_completed: bool,
     #[serde(default)]
     pub name: String,
     #[serde(default)]

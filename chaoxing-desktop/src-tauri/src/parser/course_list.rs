@@ -8,7 +8,7 @@ use scraper::{Html, Selector};
 use std::sync::OnceLock;
 
 use crate::error::AppError;
-use crate::models::course::Course;
+use crate::models::course::{Course, CourseType};
 
 /// 缓存编译后的正则和选择器，避免重复编译
 struct Selectors {
@@ -119,6 +119,9 @@ pub fn parse_course_list(html_text: &str) -> Result<Vec<Course>, AppError> {
             .unwrap_or_default()
             .to_string();
 
+        let course_type = infer_course_type(&info);
+        let course_type_label = course_type.label().to_string();
+
         course_list.push(Course {
             id,
             course_id,
@@ -129,10 +132,23 @@ pub fn parse_course_list(html_text: &str) -> Result<Vec<Course>, AppError> {
             desc,
             info,
             roleid,
+            course_type,
+            course_type_label,
         });
     }
 
     Ok(course_list)
+}
+
+fn infer_course_type(info: &str) -> CourseType {
+    let lower = info.to_ascii_lowercase();
+    if lower.contains("archive") || lower.contains("history") || info.contains("归档") {
+        CourseType::Archive
+    } else if lower.contains("course") || info.contains("课程") {
+        CourseType::Course
+    } else {
+        CourseType::Other
+    }
 }
 
 #[cfg(test)]
@@ -174,6 +190,8 @@ mod tests {
         assert_eq!(course.teacher, "张三");
         assert_eq!(course.info, "some-info");
         assert_eq!(course.roleid, "3");
+        assert_eq!(course.course_type, CourseType::Other);
+        assert_eq!(course.course_type_label, "其他");
     }
 
     #[test]
@@ -210,6 +228,7 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].id, "c003");
         assert_eq!(result[0].title, "开放课程");
+        assert_eq!(result[0].course_type, CourseType::Other);
     }
 
     #[test]

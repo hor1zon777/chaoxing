@@ -11,6 +11,7 @@ use tokio::sync::mpsc;
 use crate::api::client::HttpClient;
 use crate::error::AppError;
 use crate::models::chapter::ChapterPoint;
+use crate::models::course::CoursePointSelection;
 use crate::models::events::TaskEvent;
 use crate::task::chapter::{process_chapter, ChapterResult};
 use crate::tiku::TikuManager;
@@ -21,16 +22,14 @@ pub struct TaskScheduler {
 }
 
 impl TaskScheduler {
-    pub fn new() -> Self {
+    pub fn new(is_running: Arc<AtomicBool>, is_paused: Arc<AtomicBool>) -> Self {
         Self {
-            is_running: Arc::new(AtomicBool::new(false)),
-            is_paused: Arc::new(AtomicBool::new(false)),
+            is_running,
+            is_paused,
         }
     }
 
     /// 运行整个课程的任务
-    ///
-    /// 顺序处理每个章节，支持暂停/恢复/取消
     pub async fn run_course(
         &self,
         client: &HttpClient,
@@ -38,23 +37,20 @@ impl TaskScheduler {
         clazz_id: &str,
         cpi: &str,
         points: &[ChapterPoint],
+        point_selections: &[CoursePointSelection],
         speed: f64,
         _jobs: u32,
         notopen_action: &str,
         tiku: Option<&TikuManager>,
         event_tx: &mpsc::UnboundedSender<TaskEvent>,
     ) -> Result<(), AppError> {
-        self.is_running.store(true, Ordering::SeqCst);
-
         let mut i = 0;
         while i < points.len() {
-            // 检查是否已取消
             if !self.is_running.load(Ordering::SeqCst) {
                 tracing::info!("任务已取消");
                 return Ok(());
             }
 
-            // 暂停检查
             while self.is_paused.load(Ordering::SeqCst) {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 if !self.is_running.load(Ordering::SeqCst) {
@@ -63,11 +59,18 @@ impl TaskScheduler {
             }
 
             let point = &points[i];
+            let point_selection = point_selections
+                .iter()
+                .find(|selection| selection.point_id == point.id);
+            let selected_job_count = point_selection
+                .map(|selection| selection.selected_job_ids.len() as u32)
+                .unwrap_or(point.job_count);
+
             let _ = event_tx.send(TaskEvent::ChapterStarted {
                 course_id: course_id.to_string(),
                 chapter_id: point.id.clone(),
                 chapter_title: point.title.clone(),
-                job_count: point.job_count,
+                job_count: selected_job_count,
             });
 
             let result = process_chapter(
@@ -76,9 +79,12 @@ impl TaskScheduler {
                 clazz_id,
                 cpi,
                 point,
+                point_selection,
                 speed,
                 tiku,
                 Some(event_tx),
+                &self.is_running,
+                &self.is_paused,
             )
             .await;
 
@@ -91,6 +97,10 @@ impl TaskScheduler {
                     });
                     i += 1;
                 }
+                ChapterResult::Cancelled => {
+                    tracing::info!("章节任务已取消: {}", point.title);
+                    return Ok(());
+                }
                 ChapterResult::NotOpen => match notopen_action {
                     "continue" => {
                         let _ = event_tx.send(TaskEvent::ChapterSkipped {
@@ -102,7 +112,6 @@ impl TaskScheduler {
                         i += 1;
                     }
                     _ => {
-                        // retry: 等待后重试（简化处理，Phase 5 优化完整重试逻辑）
                         let _ = event_tx.send(TaskEvent::ChapterRetrying {
                             course_id: course_id.to_string(),
                             chapter_id: point.id.clone(),
@@ -126,21 +135,17 @@ impl TaskScheduler {
             }
         }
 
-        self.is_running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
-    /// 暂停任务
     pub fn pause(&self) {
         self.is_paused.store(true, Ordering::SeqCst);
     }
 
-    /// 恢复任务
     pub fn resume(&self) {
         self.is_paused.store(false, Ordering::SeqCst);
     }
 
-    /// 取消任务
     pub fn cancel(&self) {
         self.is_running.store(false, Ordering::SeqCst);
     }

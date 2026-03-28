@@ -1,4 +1,22 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+pub fn get_cookie_file_path() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(PathBuf::from))
+        .unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir())
+        })
+        .join(".chaoxing-desktop-cookies.txt")
+}
+
+pub fn clear_cookie_file(path: &Path) -> std::io::Result<()> {
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
 
 /// 保存 cookies 到文件 (格式: k1=v1;k2=v2)
 pub fn save_cookies_to_file(cookies: &[(String, String)], path: &Path) -> std::io::Result<()> {
