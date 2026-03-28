@@ -25,7 +25,7 @@ import {
   panelStyle,
   primaryActionButtonStyle,
   surfaceCardStyle,
-} from "../components/Layout/AppLayout";
+} from "../components/ui/pagePrimitives";
 
 const { Search } = Input;
 const { Text, Title, Paragraph } = Typography;

@@ -23,7 +23,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f5f7fb",
+          background: "#f0f2f5",
         }}
       >
         <Spin size="large" tip="正在加载已保存账号..." />
@@ -69,8 +69,12 @@ function App() {
       theme={{
         token: {
           colorPrimary: "#1677ff",
+          colorInfo: "#1677ff",
+          colorSuccess: "#16a34a",
+          colorWarning: "#d97706",
+          colorError: "#dc2626",
           borderRadius: 12,
-          colorBgLayout: "#f5f7fb",
+          colorBgLayout: "#f0f2f5",
           colorBgContainer: "#ffffff",
         },
       }}

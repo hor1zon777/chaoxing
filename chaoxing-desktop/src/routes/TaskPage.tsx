@@ -36,7 +36,7 @@ import {
   SectionTitle,
   SummaryMetric,
   surfaceCardStyle,
-} from "../components/Layout/AppLayout";
+} from "../components/ui/pagePrimitives";
 
 const { Text, Title } = Typography;
 const { useBreakpoint } = Grid;
@@ -65,13 +65,40 @@ function getLogTagColor(level: string): string {
 function getCourseStatusTag(status: string) {
   switch (status) {
     case "running":
-      return <Tag color="processing" style={{ marginInlineEnd: 0 }}>进行中</Tag>;
+      return (
+        <Tag
+          color="processing"
+          style={{ marginInlineEnd: 0, background: "#e0f2fe", color: "#0369a1", borderColor: "#bae6fd" }}
+        >
+          进行中
+        </Tag>
+      );
     case "completed":
-      return <Tag color="success" style={{ marginInlineEnd: 0 }}>已完成</Tag>;
+      return (
+        <Tag
+          color="success"
+          style={{ marginInlineEnd: 0, background: "#dcfce7", color: "#166534", borderColor: "#bbf7d0" }}
+        >
+          已完成
+        </Tag>
+      );
     case "error":
-      return <Tag color="error" style={{ marginInlineEnd: 0 }}>出错</Tag>;
+      return (
+        <Tag
+          color="error"
+          style={{ marginInlineEnd: 0, background: "#fee2e2", color: "#b91c1c", borderColor: "#fecaca" }}
+        >
+          出错
+        </Tag>
+      );
     case "pending":
-      return <Tag style={{ marginInlineEnd: 0 }}>等待中</Tag>;
+      return (
+        <Tag
+          style={{ marginInlineEnd: 0, background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" }}
+        >
+          等待中
+        </Tag>
+      );
     default:
       return <Tag style={{ marginInlineEnd: 0 }}>{status}</Tag>;
   }
@@ -344,10 +371,18 @@ export function TaskPage() {
   }, [isRunning, isPaused, selectedCourses.length]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", paddingBottom: 4 }}>
       <GuideBanner text={pageTopBannerTexts.tasks} />
 
-      <Card style={surfaceCardStyle} styles={{ body: { padding: 24 } }}>
+      <Card
+        style={{
+          ...surfaceCardStyle,
+          background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+          boxShadow: "0 16px 32px rgba(15,23,42,0.10)",
+          border: "1px solid #dbe5f0",
+        }}
+        styles={{ body: { padding: 24 } }}
+      >
         <div
           style={{
             display: "flex",
@@ -359,13 +394,27 @@ export function TaskPage() {
         >
           <div style={{ maxWidth: 760 }}>
             <Space wrap size={[8, 8]}>
-              <Tag color={statusMeta.color} style={{ marginInlineEnd: 0 }}>
+              <Tag
+                color={statusMeta.color}
+                style={{
+                  marginInlineEnd: 0,
+                  background: statusMeta.color === "processing" ? "#dbeafe" : statusMeta.color === "warning" ? "#fef3c7" : "#e5e7eb",
+                  color: statusMeta.color === "processing" ? "#1d4ed8" : statusMeta.color === "warning" ? "#92400e" : "#374151",
+                  borderColor: statusMeta.color === "processing" ? "#bfdbfe" : statusMeta.color === "warning" ? "#fde68a" : "#d1d5db",
+                }}
+              >
                 {statusMeta.label}
               </Tag>
-              <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+              <Tag
+                color="blue"
+                style={{ marginInlineEnd: 0, background: "#e0f2fe", color: "#0369a1", borderColor: "#bae6fd" }}
+              >
                 已选 {selectedCourses.length} 门课程
               </Tag>
-              <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+              <Tag
+                color="purple"
+                style={{ marginInlineEnd: 0, background: "#ede9fe", color: "#6d28d9", borderColor: "#ddd6fe" }}
+              >
                 并发 {jobCount}
               </Tag>
             </Space>
@@ -384,7 +433,7 @@ export function TaskPage() {
                 icon={<PlayCircleOutlined />}
                 onClick={handleStart}
                 disabled={selectedCourses.length === 0}
-                style={{ ...primaryActionButtonStyle }}
+                style={{ ...primaryActionButtonStyle, background: "#1677ff", borderColor: "#1677ff", color: "#ffffff", boxShadow: "0 10px 20px rgba(22,119,255,0.20)" }}
               >
                 开始学习
               </Button>
@@ -455,7 +504,9 @@ export function TaskPage() {
             style={{
               ...panelStyle,
               marginTop: 16,
-              background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+              background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)",
+              borderColor: "#bfdbfe",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)",
             }}
           >
             <div
@@ -781,10 +832,10 @@ export function TaskPage() {
               }}
             >
               <Space wrap size={[8, 8]}>
-                <Tag bordered={false}>总计 {logs.length}</Tag>
-                <Tag color="blue" bordered={false}>信息 {logStats.info}</Tag>
-                <Tag color="orange" bordered={false}>警告 {logStats.warn}</Tag>
-                <Tag color="red" bordered={false}>错误 {logStats.error}</Tag>
+                <Tag bordered={false} style={{ background: "#e5e7eb", color: "#374151" }}>总计 {logs.length}</Tag>
+                <Tag color="blue" bordered={false} style={{ background: "#dbeafe", color: "#1d4ed8" }}>信息 {logStats.info}</Tag>
+                <Tag color="orange" bordered={false} style={{ background: "#fef3c7", color: "#92400e" }}>警告 {logStats.warn}</Tag>
+                <Tag color="red" bordered={false} style={{ background: "#fee2e2", color: "#b91c1c" }}>错误 {logStats.error}</Tag>
               </Space>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 当前显示 {filteredLogs.length} 条{logFilter !== "all" ? `（${logFilter}）` : ""}
@@ -800,7 +851,7 @@ export function TaskPage() {
                 fontFamily: "Consolas, Monaco, 'Courier New', monospace",
                 fontSize: 12,
                 lineHeight: 1.7,
-                background: "#fafafa",
+                background: "#f8fafc",
               }}
             >
               {filteredLogs.length === 0 ? (

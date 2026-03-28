@@ -35,7 +35,7 @@ import {
   SectionTitle,
   SummaryMetric,
   surfaceCardStyle,
-} from "../components/Layout/AppLayout";
+} from "../components/ui/pagePrimitives";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -444,4 +444,3 @@ export function LoginPage() {
     </div>
   );
 }
-

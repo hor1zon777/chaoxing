@@ -32,7 +32,7 @@ import {
   SectionTitle,
   SummaryMetric,
   surfaceCardStyle,
-} from "../components/Layout/AppLayout";
+} from "../components/ui/pagePrimitives";
 
 const { Text, Title, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
