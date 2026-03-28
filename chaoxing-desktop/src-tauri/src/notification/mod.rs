@@ -21,21 +21,103 @@ pub enum NotificationProvider {
     Disabled,
 }
 
+fn normalize_serverchan_url(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return trimmed.to_string();
+    }
+
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    format!("https://sctapi.ftqq.com/{trimmed}.send")
+}
+
+fn normalize_qmsg_url(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return trimmed.to_string();
+    }
+
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    format!("https://qmsg.zendee.cn/send/{trimmed}")
+}
+
+fn normalize_bark_url(value: &str) -> String {
+    let trimmed = value.trim().trim_matches('/');
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return trimmed.to_string();
+    }
+
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    format!("https://api.day.app/{trimmed}")
+}
+
+fn normalize_telegram_url(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return trimmed.to_string();
+    }
+
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    format!("https://api.telegram.org/bot{trimmed}/sendMessage")
+}
+
 impl NotificationProvider {
     /// 从配置创建
     pub fn from_config(config: &AppConfig) -> Self {
-        let url = config.notification_url.trim();
-        if url.is_empty() {
+        let provider = config.notification_provider.trim().to_ascii_lowercase();
+        let raw_url = config.notification_url.trim();
+        if raw_url.is_empty() {
             return Self::Disabled;
         }
-        match config.notification_provider.as_str() {
-            "ServerChan" => Self::ServerChan(serverchan::ServerChan::new(url)),
-            "Qmsg" => Self::Qmsg(qmsg::Qmsg::new(url)),
-            "Bark" => Self::Bark(bark::Bark::new(url)),
-            "Telegram" => Self::Telegram(telegram::Telegram::new(
-                url,
-                &config.notification_tg_chat_id,
-            )),
+
+        match provider.as_str() {
+            "serverchan" => {
+                let url = normalize_serverchan_url(raw_url);
+                if url.is_empty() {
+                    Self::Disabled
+                } else {
+                    Self::ServerChan(serverchan::ServerChan::new(&url))
+                }
+            }
+            "qmsg" => {
+                let url = normalize_qmsg_url(raw_url);
+                if url.is_empty() {
+                    Self::Disabled
+                } else {
+                    Self::Qmsg(qmsg::Qmsg::new(&url))
+                }
+            }
+            "bark" => {
+                let url = normalize_bark_url(raw_url);
+                if url.is_empty() {
+                    Self::Disabled
+                } else {
+                    Self::Bark(bark::Bark::new(&url))
+                }
+            }
+            "telegram" => {
+                let url = normalize_telegram_url(raw_url);
+                if url.is_empty() {
+                    Self::Disabled
+                } else {
+                    Self::Telegram(telegram::Telegram::new(
+                        &url,
+                        &config.notification_tg_chat_id,
+                    ))
+                }
+            }
             _ => Self::Disabled,
         }
     }

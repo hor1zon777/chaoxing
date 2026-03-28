@@ -91,32 +91,32 @@ export function SettingsPage() {
       case "serverchan":
         return {
           primaryLabel: "Server酱 SendKey / 推送地址",
-          primaryPlaceholder: "输入 Server酱 SendKey 或完整推送地址",
-          helperText: "Server酱通常只需要 SendKey 或完整推送 URL。",
+          primaryPlaceholder: "输入 SendKey，或完整发送地址",
+          helperText: "支持直接填写 SendKey，系统会自动补全为 Server酱发送地址。",
           showPrimaryField: true,
           showChatIdField: false,
         };
       case "qmsg":
         return {
           primaryLabel: "Qmsg Key / 推送地址",
-          primaryPlaceholder: "输入 Qmsg Key 或完整推送地址",
-          helperText: "Qmsg 通常只需要推送 Key 或完整推送 URL。",
+          primaryPlaceholder: "输入 Qmsg Key，或完整发送地址",
+          helperText: "支持直接填写 Qmsg Key，系统会自动补全为 Qmsg 发送地址。",
           showPrimaryField: true,
           showChatIdField: false,
         };
       case "bark":
         return {
-          primaryLabel: "Bark 推送地址",
-          primaryPlaceholder: "输入 Bark 推送 URL，例如 https://api.day.app/你的key",
-          helperText: "Bark 只需要推送地址，无需额外 Chat ID。",
+          primaryLabel: "Bark Key / 推送地址",
+          primaryPlaceholder: "输入 Bark Key，或完整推送地址",
+          helperText: "支持直接填写 Bark Key，系统会自动补全为 https://api.day.app/你的key。",
           showPrimaryField: true,
           showChatIdField: false,
         };
       case "telegram":
         return {
           primaryLabel: "Telegram Bot Token / API 地址",
-          primaryPlaceholder: "输入 Bot Token 或 Telegram Bot API 地址",
-          helperText: "Telegram 需要同时填写 Bot Token 或 API 地址，以及 Chat ID。",
+          primaryPlaceholder: "输入 Bot Token，或完整 sendMessage API 地址",
+          helperText: "支持直接填写 Bot Token，系统会自动补全为 Telegram sendMessage 地址，并需要同时填写 Chat ID。",
           showPrimaryField: true,
           showChatIdField: true,
         };
@@ -165,9 +165,9 @@ export function SettingsPage() {
     try {
       const values = form.getFieldsValue();
       const ok = await invoke<boolean>("test_notification", {
-        provider: values.notificationProvider,
-        url: values.notificationUrl,
-        tgChatId: values.notificationTgChatId,
+        provider: values.notificationProvider ?? "",
+        url: values.notificationUrl ?? "",
+        tgChatId: values.notificationTgChatId ?? "",
       });
       if (ok) {
         msgApi.success("测试通知发送成功");
