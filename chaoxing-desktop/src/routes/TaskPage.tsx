@@ -433,7 +433,7 @@ export function TaskPage() {
                 icon={<PlayCircleOutlined />}
                 onClick={handleStart}
                 disabled={selectedCourses.length === 0}
-                style={{ ...primaryActionButtonStyle, background: "#1677ff", borderColor: "#1677ff", color: "#ffffff", boxShadow: "0 10px 20px rgba(22,119,255,0.20)" }}
+                style={{ ...primaryActionButtonStyle, background: "#2563eb", borderColor: "#2563eb", color: "#ffffff", boxShadow: "0 12px 24px rgba(37,99,235,0.20)" }}
               >
                 开始学习
               </Button>

@@ -129,13 +129,17 @@ export function AppLayout() {
       <Sider
         width={236}
         theme="light"
-        style={{ borderRight: "1px solid #d6deea", background: "#e9eef5" }}
+        style={{
+          borderRight: "1px solid #c8d8ee",
+          background: "linear-gradient(180deg, #eaf2fb 0%, #e2edf9 100%)",
+          boxShadow: "inset -1px 0 0 rgba(255,255,255,0.5)",
+        }}
       >
         <div
           style={{
             padding: "20px 20px 16px",
-            borderBottom: "1px solid #dbe3ef",
-            background: "#e9eef5",
+            borderBottom: "1px solid #d2dfef",
+            background: "linear-gradient(180deg, #eef5ff 0%, #e6effb 100%)",
           }}
         >
           <Title level={4} style={{ margin: 0, fontSize: 20 }}>
@@ -153,14 +157,14 @@ export function AppLayout() {
           ]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
-          style={{ borderRight: 0, padding: "16px 12px", background: "#e9eef5" }}
+          style={{ borderRight: 0, padding: "16px 12px", background: "transparent" }}
         />
 
         <div
           style={{
             margin: "0 12px 16px",
             height: 1,
-            background: "linear-gradient(90deg, transparent 0%, #cbd5e1 18%, #cbd5e1 82%, transparent 100%)",
+            background: "linear-gradient(90deg, transparent 0%, #b7c7dd 18%, #b7c7dd 82%, transparent 100%)",
           }}
         />
       </Sider>
@@ -170,8 +174,8 @@ export function AppLayout() {
           style={{
             height: 88,
             padding: "0 24px",
-            background: "#f0f2f5",
-            borderBottom: "1px solid #dbe3ef",
+            background: "linear-gradient(180deg, #f3f7fd 0%, #edf3fb 100%)",
+            borderBottom: "1px solid #d6e2f0",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -202,9 +206,9 @@ export function AppLayout() {
                 height: "auto",
                 padding: "10px 14px",
                 borderRadius: 16,
-                border: "1px solid #dbe3ef",
-                background: "#ffffff",
-                boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
+                border: "1px solid #d6e3f5",
+                background: "linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)",
+                boxShadow: "0 12px 24px rgba(37,99,235,0.08)",
               }}
             >
               <Space size={12} align="center">
@@ -213,8 +217,8 @@ export function AppLayout() {
                     width: 36,
                     height: 36,
                     borderRadius: 12,
-                    background: "#dbeafe",
-                    color: "#1677ff",
+                    background: "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
+                    color: "#1d4ed8",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -245,7 +249,7 @@ export function AppLayout() {
         <Content
           style={{
             padding: 24,
-            background: "#f0f2f5",
+            background: "#edf3fb",
             overflow: "auto",
           }}
         >

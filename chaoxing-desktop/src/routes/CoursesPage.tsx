@@ -265,11 +265,13 @@ export function CoursesPage() {
                       }}
                       style={{
                         borderRadius: 18,
-                        borderColor: isSelected ? "#b7d3ff" : "#edf1f6",
-                        background: isSelected ? "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)" : "#ffffff",
+                        borderColor: isSelected ? "#aac7ff" : "#dbe6f5",
+                        background: isSelected
+                          ? "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)"
+                          : "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
                         boxShadow: isSelected
-                          ? "0 14px 28px rgba(22,119,255,0.10)"
-                          : "0 10px 24px rgba(15,23,42,0.05)",
+                          ? "0 18px 34px rgba(37,99,235,0.12)"
+                          : "0 12px 28px rgba(37,99,235,0.07)",
                         transition: "all 0.2s ease",
                         cursor: "pointer",
                       }}
@@ -288,8 +290,20 @@ export function CoursesPage() {
                         </div>
 
                         <Space wrap size={[8, 8]}>
-                          {isSelected && <Tag color="success">已配置</Tag>}
-                          <Tag bordered={false} color="default">
+                          {isSelected && (
+                            <Tag color="success" style={{ marginInlineEnd: 0 }}>
+                              已配置
+                            </Tag>
+                          )}
+                          <Tag
+                            bordered={false}
+                            style={{
+                              marginInlineEnd: 0,
+                              background: "#eef5ff",
+                              color: "#1e40af",
+                              border: "1px solid #dbeafe",
+                            }}
+                          >
                             教师：{course.teacher || "未知教师"}
                           </Tag>
                         </Space>
@@ -314,7 +328,7 @@ export function CoursesPage() {
                           style={{
                             marginTop: "auto",
                             paddingTop: 12,
-                            borderTop: "1px solid #f0f2f5",
+                            borderTop: "1px solid #e2ebf7",
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
@@ -324,7 +338,7 @@ export function CoursesPage() {
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             课程 ID：{course.courseId}
                           </Text>
-                          <Text style={{ color: "#1677ff", fontSize: 13 }}>
+                          <Text style={{ color: "#1d4ed8", fontSize: 13, fontWeight: 600 }}>
                             进入配置 <RightOutlined style={{ fontSize: 12 }} />
                           </Text>
                         </div>

@@ -171,7 +171,7 @@ export function LoginPage() {
         minHeight: "100vh",
         padding: 24,
         background:
-          "radial-gradient(circle at top, rgba(22,119,255,0.08), transparent 32%), #f3f6fb",
+          "radial-gradient(circle at top, rgba(37,99,235,0.16), transparent 32%), radial-gradient(circle at bottom right, rgba(245,158,11,0.10), transparent 26%), #edf3fb",
       }}
     >
       <Card
@@ -237,8 +237,8 @@ export function LoginPage() {
               size="small"
               style={{
                 ...surfaceCardStyle,
-                background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
-                border: "1px solid #e8f1ff",
+                background: "linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%)",
+                border: "1px solid #d8e7fb",
               }}
               styles={{ body: { padding: 18 } }}
             >
@@ -262,7 +262,8 @@ export function LoginPage() {
                             style={{
                               ...panelStyle,
                               width: "100%",
-                              background: "#fff",
+                              background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+                              border: "1px solid #d6e3f8",
                               display: "flex",
                               justifyContent: "space-between",
                               alignItems: "flex-start",
@@ -325,8 +326,9 @@ export function LoginPage() {
           <Card
             style={{
               borderRadius: 18,
-              border: "1px solid #eef2f6",
-              boxShadow: "0 10px 28px rgba(15,23,42,0.05)",
+              border: "1px solid #d8e6f8",
+              background: "linear-gradient(180deg, #ffffff 0%, #f9fbff 100%)",
+              boxShadow: "0 16px 32px rgba(37,99,235,0.08)",
             }}
             styles={{ body: { padding: 20 } }}
           >

@@ -367,7 +367,16 @@ export function SettingsPage() {
           />
         </Form.Item>
 
-        <div style={{ marginBottom: 16, ...panelCardStyle, padding: "12px 14px" }}>
+        <div
+          style={{
+            marginBottom: 16,
+            ...panelCardStyle,
+            padding: "12px 14px",
+            border: "1px solid #f8d9a8",
+            background: "linear-gradient(180deg, #fff8eb 0%, #ffffff 100%)",
+            boxShadow: "0 8px 20px rgba(245,158,11,0.08)",
+          }}
+        >
           <Text strong style={{ display: "block", marginBottom: 4 }}>
             当前渠道：{notificationProviderLabel}
           </Text>
@@ -424,8 +433,9 @@ export function SettingsPage() {
             style={{
               padding: "12px 16px",
               borderRadius: 16,
-              border: "1px solid #dceafe",
-              background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+              border: "1px solid #bfd4ff",
+              background: "linear-gradient(180deg, #eef6ff 0%, #ffffff 100%)",
+              boxShadow: "0 10px 22px rgba(37,99,235,0.08)",
               minWidth: screens.md ? 250 : "100%",
             }}
           >

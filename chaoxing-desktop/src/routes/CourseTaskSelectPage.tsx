@@ -193,7 +193,15 @@ export function CourseTaskSelectPage() {
               <Tag color="blue" style={{ marginInlineEnd: 0 }}>
                 {course.courseTypeLabel}
               </Tag>
-              <Tag color="cyan" style={{ marginInlineEnd: 0 }}>
+              <Tag
+                color="cyan"
+                style={{
+                  marginInlineEnd: 0,
+                  background: "#ecfeff",
+                  color: "#155e75",
+                  borderColor: "#a5f3fc",
+                }}
+              >
                 已选 {selectedJobCount} 个任务
               </Tag>
             </Space>
@@ -210,7 +218,8 @@ export function CourseTaskSelectPage() {
             style={{
               ...panelStyle,
               minWidth: screens.md ? 240 : "100%",
-              background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+              background: "linear-gradient(180deg, #eef6ff 0%, #ffffff 100%)",
+              border: "1px solid #bfd4ff",
             }}
           >
             <Text strong style={{ display: "block", marginBottom: 8 }}>
@@ -402,7 +411,16 @@ export function CourseTaskSelectPage() {
                             已完成
                           </Tag>
                         ) : (
-                          <Tag style={{ marginInlineEnd: 0 }}>未完成</Tag>
+                          <Tag
+                            style={{
+                              marginInlineEnd: 0,
+                              background: "#eff6ff",
+                              color: "#1d4ed8",
+                              borderColor: "#bfdbfe",
+                            }}
+                          >
+                            未完成
+                          </Tag>
                         )}
                         {job.needUnlock && (
                           <Tag color="orange" style={{ marginInlineEnd: 0 }}>
@@ -414,7 +432,14 @@ export function CourseTaskSelectPage() {
                             章节已完成
                           </Tag>
                         )}
-                        <Tag bordered={false} style={{ marginInlineEnd: 0 }}>
+                        <Tag
+                          bordered={false}
+                          style={{
+                            marginInlineEnd: 0,
+                            background: "#f8fafc",
+                            color: "#475569",
+                          }}
+                        >
                           {job.pointTitle}
                         </Tag>
                       </Space>

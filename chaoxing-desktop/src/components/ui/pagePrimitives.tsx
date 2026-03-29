@@ -4,23 +4,25 @@ import { Typography } from "antd";
 const { Text } = Typography;
 
 export const surfaceCardStyle = {
-  borderRadius: 18,
-  boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
-  border: "1px solid #e2e8f0",
-  background: "#ffffff",
+  borderRadius: 20,
+  boxShadow: "0 18px 40px rgba(37,99,235,0.08), 0 10px 24px rgba(15,23,42,0.05)",
+  border: "1px solid #d8e6f8",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
 };
 
 export const panelCardStyle = {
   borderRadius: 16,
-  border: "1px solid #edf2fa",
-  background: "#fafcff",
+  border: "1px solid #dbe7f6",
+  background: "linear-gradient(180deg, #fcfdff 0%, #f6f9ff 100%)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
 };
 
 export const panelStyle = {
   ...panelCardStyle,
   padding: "14px 16px",
-  background: "#f8fbff",
-  border: "1px solid #dbeafe",
+  background: "linear-gradient(180deg, #f4f8ff 0%, #edf4ff 100%)",
+  border: "1px solid #cfe0ff",
+  boxShadow: "0 8px 20px rgba(59,130,246,0.08)",
 };
 
 export const primaryActionButtonStyle = {
@@ -28,6 +30,8 @@ export const primaryActionButtonStyle = {
   height: 42,
   borderRadius: 12,
   paddingInline: 20,
+  fontWeight: 600,
+  boxShadow: "0 10px 24px rgba(37,99,235,0.16)",
 };
 
 export const workflowCopy = {
@@ -42,20 +46,22 @@ export function GuideBanner({ text }: { text: string }) {
   return (
     <div
       style={{
-        padding: "16px 18px",
-        borderRadius: 18,
-        border: "1px solid #dbeafe",
-        background: "linear-gradient(135deg, #eef4ff 0%, #f8fbff 100%)",
-        boxShadow: "0 8px 24px rgba(22,119,255,0.06)",
+        padding: "18px 20px",
+        borderRadius: 20,
+        border: "1px solid #c7dbff",
+        background:
+          "linear-gradient(135deg, rgba(37,99,235,0.14) 0%, rgba(59,130,246,0.08) 34%, rgba(245,158,11,0.10) 100%)",
+        boxShadow: "0 14px 30px rgba(37,99,235,0.10)",
       }}
     >
       <Text
         style={{
           display: "block",
           fontSize: 16,
-          fontWeight: 600,
-          lineHeight: 1.7,
-          color: "#1f2937",
+          fontWeight: 700,
+          lineHeight: 1.75,
+          color: "#1e3a8a",
+          letterSpacing: 0.2,
         }}
       >
         {text}
@@ -71,7 +77,7 @@ export function GuideLabel({ text }: { text: string }) {
         display: "block",
         fontSize: 12,
         fontWeight: 600,
-        color: "#1677ff",
+        color: "#2563eb",
         marginBottom: 8,
       }}
     >
@@ -232,28 +238,30 @@ export const leadTextStyle = {
 };
 
 export const courseCardShadow = "0 10px 24px rgba(15,23,42,0.05)";
-export const selectedCourseCardShadow = "0 14px 28px rgba(22,119,255,0.10)";
+export const selectedCourseCardShadow = "0 18px 34px rgba(37,99,235,0.12)";
 
 export const summaryAccentPanelStyle = {
   ...panelStyle,
-  background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+  background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)",
+  border: "1px solid #bfd4ff",
 };
 
 export const savedAccountCardStyle = {
   ...surfaceCardStyle,
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
-  border: "1px solid #e8f1ff",
+  background: "linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%)",
+  border: "1px solid #d8e7fb",
 };
 
 export const accountItemPanelStyle = {
   ...panelStyle,
-  background: "#fff",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+  border: "1px solid #d6e3f8",
 };
 
 export const topSummaryPanelStyle = {
   ...panelStyle,
-  border: "1px solid #dceafe",
-  background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+  border: "1px solid #bfd4ff",
+  background: "linear-gradient(180deg, #eef5ff 0%, #ffffff 100%)",
 };
 
 export const actionPrimaryText = {
@@ -364,7 +372,7 @@ export const helperPanelMarginBottom = 16;
 export const loginShellCardStyle = {
   ...surfaceCardStyle,
   borderRadius: 22,
-  boxShadow: "0 20px 56px rgba(22,119,255,0.12)",
+  boxShadow: "0 24px 60px rgba(37,99,235,0.14), 0 14px 36px rgba(15,23,42,0.06)",
 };
 
 export const helperBannerPanelStyle = {
@@ -521,16 +529,17 @@ export const bannerTextLabelStyle = {
   display: "block",
   fontSize: 12,
   fontWeight: 600,
-  color: "#1677ff",
+  color: "#2563eb",
   marginBottom: 8,
 };
 
 export const bannerPanelStyle = {
-  padding: "16px 18px",
-  borderRadius: 18,
-  border: "1px solid #dbeafe",
-  background: "linear-gradient(135deg, #eef4ff 0%, #f8fbff 100%)",
-  boxShadow: "0 8px 24px rgba(22,119,255,0.06)",
+  padding: "18px 20px",
+  borderRadius: 20,
+  border: "1px solid #c7dbff",
+  background:
+    "linear-gradient(135deg, rgba(37,99,235,0.14) 0%, rgba(59,130,246,0.08) 34%, rgba(245,158,11,0.10) 100%)",
+  boxShadow: "0 14px 30px rgba(37,99,235,0.10)",
 };
 
 export function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
@@ -558,14 +567,22 @@ export function SummaryMetric({
   style?: CSSProperties;
 }) {
   return (
-    <div style={{ ...panelStyle, ...style }}>
-      <Text type="secondary" style={{ display: "block", fontSize: 12, marginBottom: 6 }}>
+    <div
+      style={{
+        ...panelStyle,
+        background: "linear-gradient(180deg, #ffffff 0%, #edf4ff 100%)",
+        border: "1px solid #cfe0ff",
+        boxShadow: "0 10px 22px rgba(37,99,235,0.08)",
+        ...style,
+      }}
+    >
+      <Text type="secondary" style={{ display: "block", fontSize: 12, marginBottom: 6, color: "#475569" }}>
         {label}
       </Text>
-      <Text strong style={{ display: "block", fontSize: 18, lineHeight: 1.4 }}>
+      <Text strong style={{ display: "block", fontSize: 18, lineHeight: 1.4, color: "#1e3a8a" }}>
         {value}
       </Text>
-      <Text type="secondary" style={{ fontSize: 12 }}>
+      <Text type="secondary" style={{ fontSize: 12, color: "#64748b" }}>
         {hint}
       </Text>
     </div>
