@@ -40,7 +40,7 @@ impl TikuSiliconFlow {
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
-                .expect("创建硅基流动 HTTP 客户端失败"),
+                .unwrap_or_default(),
         }
     }
 
@@ -159,16 +159,27 @@ impl TikuSiliconFlow {
 
     /// 等待请求间隔
     async fn wait_for_interval(&self) {
-        let last = self.last_request_time.lock().await;
-        if let Some(last_time) = *last {
-            let elapsed = last_time.elapsed();
-            let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
-            if elapsed < min_interval {
-                let sleep_time = min_interval - elapsed;
-                tracing::debug!("硅基流动请求间隔过短，等待 {:?}", sleep_time);
-                drop(last);
-                tokio::time::sleep(sleep_time).await;
+        let sleep_duration = {
+            let mut last = self.last_request_time.lock().await;
+            if let Some(last_time) = *last {
+                let elapsed = last_time.elapsed();
+                let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
+                if elapsed < min_interval {
+                    let sleep_time = min_interval - elapsed;
+                    tracing::debug!("硅基流动请求间隔过短，等待 {:?}", sleep_time);
+                    *last = Some(Instant::now() + sleep_time);
+                    Some(sleep_time)
+                } else {
+                    *last = Some(Instant::now());
+                    None
+                }
+            } else {
+                *last = Some(Instant::now());
+                None
             }
+        };
+        if let Some(d) = sleep_duration {
+            tokio::time::sleep(d).await;
         }
     }
 

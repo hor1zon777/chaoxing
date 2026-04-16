@@ -160,11 +160,12 @@ impl TikuManager {
             .filter(|s| !s.is_empty())
             .collect();
 
-        // 缓存文件放在可执行文件所在目录（Tauri 桌面应用中比 current_dir 更稳定）
-        let cache_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+        // 缓存文件放在用户数据目录（避免使用 current_exe 路径，可能为只读的 Program Files）
+        let cache_path = std::env::var_os("LOCALAPPDATA")
+            .or_else(|| std::env::var_os("HOME"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(std::env::temp_dir)
+            .join("chaoxing-desktop")
             .join("cache.json");
 
         Self {

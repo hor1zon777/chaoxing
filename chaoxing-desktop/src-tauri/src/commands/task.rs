@@ -6,7 +6,7 @@
 //! - resume_tasks: 恢复任务
 //! - cancel_tasks: 取消任务
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tauri::ipc::Channel;
@@ -20,6 +20,19 @@ use crate::models::course::CourseTaskSelection;
 use crate::state::AppState;
 use crate::task::scheduler::TaskScheduler;
 use crate::tiku::TikuManager;
+
+/// RAII guard：确保 is_running 在任何退出路径（包括 panic）时都被重置
+struct RunningGuard {
+    is_running: Arc<AtomicBool>,
+    is_paused: Arc<AtomicBool>,
+}
+
+impl Drop for RunningGuard {
+    fn drop(&mut self) {
+        self.is_running.store(false, Ordering::SeqCst);
+        self.is_paused.store(false, Ordering::SeqCst);
+    }
+}
 
 /// 启动课程任务
 ///
@@ -50,6 +63,12 @@ pub async fn start_course_tasks(
     if state.is_running.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
         return Err(AppError::Other("任务已在运行中".to_string()));
     }
+
+    // RAII guard：无论正常返回、提前 return 还是 panic，都会重置 is_running/is_paused
+    let _guard = RunningGuard {
+        is_running: state.is_running.clone(),
+        is_paused: state.is_paused.clone(),
+    };
 
     state.is_paused.store(false, Ordering::SeqCst);
     let scheduler = TaskScheduler::new(state.is_running.clone(), state.is_paused.clone());
@@ -88,9 +107,11 @@ pub async fn start_course_tasks(
     tiku.init().await;
 
     let config_check = state.config.read().await;
+    let mut tiku_disabled_by_check = false;
     if config_check.check_llm_connection && !tiku.disabled {
         drop(config_check);
         if !tiku.check_connection().await {
+            tiku_disabled_by_check = true;
             let _ = tx.send(TaskEvent::Log {
                 level: "error".to_string(),
                 message: "题库/LLM 连接检查失败，题库功能将被禁用".to_string(),
@@ -101,7 +122,7 @@ pub async fn start_course_tasks(
         drop(config_check);
     }
 
-    let tiku_ref = if tiku.disabled { None } else { Some(Arc::new(tiku)) };
+    let tiku_ref = if tiku.disabled || tiku_disabled_by_check { None } else { Some(Arc::new(tiku)) };
 
     // 错误收集：确保 cleanup 代码始终执行
     let mut task_error: Option<AppError> = None;
@@ -200,10 +221,8 @@ pub async fn start_course_tasks(
         });
     }
 
-    // Cleanup 始终执行，无论是否发生错误
+    // _guard 的 Drop 会自动重置 is_running / is_paused
     let was_cancelled = !state.is_running.load(Ordering::SeqCst);
-    state.is_running.store(false, Ordering::SeqCst);
-    state.is_paused.store(false, Ordering::SeqCst);
     if !was_cancelled && task_error.is_none() {
         let _ = tx.send(TaskEvent::AllTasksCompleted);
     }

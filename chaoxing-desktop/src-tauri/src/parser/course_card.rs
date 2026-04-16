@@ -15,7 +15,7 @@ use crate::models::job::{Job, JobInfo, JobType};
 static MARG_RE: OnceLock<Regex> = OnceLock::new();
 
 fn marg_re() -> &'static Regex {
-    MARG_RE.get_or_init(|| Regex::new(r"mArg\s*=\s*\{(.*?)\};").unwrap())
+    MARG_RE.get_or_init(|| Regex::new(r"(?s)mArg\s*=\s*\{(.*?)\};").unwrap())
 }
 
 /// 解析任务点列表页面，提取任务列表和任务信息

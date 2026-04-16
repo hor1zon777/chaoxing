@@ -1,5 +1,12 @@
 use crate::error::AppError;
 
+/// 转义 Telegram HTML parse_mode 的特殊字符
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 pub struct Telegram {
     url: String,
     chat_id: String,
@@ -19,9 +26,10 @@ impl Telegram {
     }
 
     pub async fn send(&self, message: &str) -> Result<(), AppError> {
+        let escaped = escape_html(message);
         let params = [
             ("chat_id", self.chat_id.as_str()),
-            ("text", message),
+            ("text", escaped.as_str()),
             ("parse_mode", "HTML"),
         ];
         let resp = self

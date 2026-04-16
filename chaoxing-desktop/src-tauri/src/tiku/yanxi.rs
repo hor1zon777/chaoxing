@@ -34,7 +34,7 @@ impl TikuYanxi {
                 .danger_accept_invalid_certs(true)
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
-                .expect("创建言溪题库 HTTP 客户端失败"),
+                .unwrap_or_default(),
         }
     }
 

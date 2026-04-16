@@ -54,10 +54,13 @@ impl CacheDAO {
 
     /// 写入缓存（内存 + 持久化到文件）
     pub async fn set(&self, question: &str, answer: &str) {
-        let mut cache = self.cache.write().await;
-        cache.insert(question.to_string(), answer.to_string());
-        // 持久化到文件（在持有写锁期间完成，保证一致性）
-        self.save_to_file(&cache);
+        let snapshot = {
+            let mut cache = self.cache.write().await;
+            cache.insert(question.to_string(), answer.to_string());
+            cache.clone()
+        };
+        // 在写锁释放后再执行阻塞 I/O，避免阻塞其他并发读取
+        self.save_to_file(&snapshot);
     }
 
     /// 原子写入缓存文件

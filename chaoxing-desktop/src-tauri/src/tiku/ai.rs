@@ -145,12 +145,6 @@ impl TikuAi {
             }
         };
 
-        // 更新最后请求时间
-        {
-            let mut last = self.last_request_time.lock().await;
-            *last = Some(Instant::now());
-        }
-
         if resp.status().as_u16() != 200 {
             tracing::error!("AI 大模型查询失败: HTTP {}", resp.status());
             return None;
@@ -207,16 +201,28 @@ impl TikuAi {
 
     /// 等待请求间隔
     async fn wait_for_interval(&self) {
-        let last = self.last_request_time.lock().await;
-        if let Some(last_time) = *last {
-            let elapsed = last_time.elapsed();
-            let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
-            if elapsed < min_interval {
-                let sleep_time = min_interval - elapsed;
-                tracing::debug!("AI 请求间隔过短，等待 {:?}", sleep_time);
-                drop(last); // 释放锁后再 sleep
-                tokio::time::sleep(sleep_time).await;
+        let sleep_duration = {
+            let mut last = self.last_request_time.lock().await;
+            if let Some(last_time) = *last {
+                let elapsed = last_time.elapsed();
+                let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
+                if elapsed < min_interval {
+                    let sleep_time = min_interval - elapsed;
+                    tracing::debug!("AI 请求间隔过短，等待 {:?}", sleep_time);
+                    // 预占时间槽，防止并发请求同时通过
+                    *last = Some(Instant::now() + sleep_time);
+                    Some(sleep_time)
+                } else {
+                    *last = Some(Instant::now());
+                    None
+                }
+            } else {
+                *last = Some(Instant::now());
+                None
             }
+        };
+        if let Some(d) = sleep_duration {
+            tokio::time::sleep(d).await;
         }
     }
 

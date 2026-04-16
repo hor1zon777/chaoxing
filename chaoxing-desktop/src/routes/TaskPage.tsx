@@ -212,6 +212,7 @@ export function TaskPage() {
   }, [selectedCourses, learningSelections]);
 
   const handleStart = useCallback(async () => {
+    if (isActionPending) return;
     if (selectedCourses.length === 0) {
       message.warning("请先进入课程配置页选择任务后再开始学习");
       return;
@@ -222,10 +223,11 @@ export function TaskPage() {
       (course) => course.selectedPoints.length === 0,
     );
     if (invalidSelection) {
-      message.warning(`请先为课程“${invalidSelection.title}”选择章节或任务`);
+      message.warning(`请先为课程"${invalidSelection.title}"选择章节或任务`);
       return;
     }
 
+    setIsActionPending(true);
     reset();
     setRunning(true);
 
@@ -247,8 +249,11 @@ export function TaskPage() {
       const errorMsg = e instanceof Error ? e.message : String(e);
       addLog("error", `任务启动失败: ${errorMsg}`);
       setRunning(false);
+    } finally {
+      setIsActionPending(false);
     }
   }, [
+    isActionPending,
     selectedCourses,
     getSelectedLearningSelections,
     speed,

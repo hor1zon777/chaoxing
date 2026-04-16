@@ -164,25 +164,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   fetchSavedAccounts: async () => {
-    const nextVersion = useAuthStore.getState().authVersion + 1;
-    set({ isLoading: true, error: null, authVersion: nextVersion });
+    set({ isLoading: true, error: null });
     try {
       const savedAccounts = await invoke<SavedAccountSummary[]>("list_saved_accounts");
-      const currentState = useAuthStore.getState();
-      if (currentState.authVersion !== nextVersion) {
-        return;
-      }
       set({
         savedAccounts,
         isLoading: false,
         hasInitialized: true,
-        isLoggedIn: currentState.isLoggedIn,
-        username: currentState.username,
       });
     } catch (err) {
-      if (useAuthStore.getState().authVersion !== nextVersion) {
-        return;
-      }
       const message = err instanceof Error ? err.message : String(err);
       set({
         savedAccounts: [],

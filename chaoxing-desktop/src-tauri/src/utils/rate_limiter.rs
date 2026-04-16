@@ -19,12 +19,21 @@ impl RateLimiter {
 
     /// 限速: 确保两次调用之间至少间隔 call_interval
     pub async fn limit_rate(&self) {
-        let mut last = self.last_call.lock().await;
-        let elapsed = last.elapsed();
-        if elapsed < self.call_interval {
-            tokio::time::sleep(self.call_interval - elapsed).await;
+        let sleep_duration = {
+            let mut last = self.last_call.lock().await;
+            let elapsed = last.elapsed();
+            if elapsed < self.call_interval {
+                let duration = self.call_interval - elapsed;
+                *last = Instant::now() + duration;
+                Some(duration)
+            } else {
+                *last = Instant::now();
+                None
+            }
+        };
+        if let Some(d) = sleep_duration {
+            tokio::time::sleep(d).await;
         }
-        *last = Instant::now();
     }
 
     /// 随机限速: 在 [min, max] 秒范围内随机等待后再执行限速

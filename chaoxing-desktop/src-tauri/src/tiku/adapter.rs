@@ -31,7 +31,7 @@ impl TikuAdapter {
                 .danger_accept_invalid_certs(true)
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
-                .expect("创建 TikuAdapter HTTP 客户端失败"),
+                .unwrap_or_default(),
         }
     }
 

@@ -49,6 +49,7 @@ pub async fn run_live(
         .unwrap_or(30 * 60); // 默认 30 分钟
 
     // 根据倍速调整时长，向上取整为分钟
+    let speed = if speed <= 0.0 { 1.0 } else { speed };
     let adjusted = duration_secs as f64 / speed;
     let total_minutes = ((adjusted as u64) + 59) / 60;
 
@@ -99,7 +100,7 @@ pub async fn run_live(
         }
 
         // 根据倍速调整间隔 (59 / speed 秒)
-        let sleep_time = 59.0 / speed;
+        let sleep_time = 59.0 / speed.max(0.1);
         tokio::time::sleep(Duration::from_secs_f64(sleep_time)).await;
     }
 

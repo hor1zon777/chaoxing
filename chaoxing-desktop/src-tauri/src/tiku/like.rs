@@ -64,7 +64,7 @@ impl TikuLike {
                 .danger_accept_invalid_certs(true)
                 .timeout(std::time::Duration::from_secs(300))
                 .build()
-                .expect("创建 LIKE 知识库 HTTP 客户端失败"),
+                .unwrap_or_default(),
             query_count: AtomicU32::new(0),
         }
     }
