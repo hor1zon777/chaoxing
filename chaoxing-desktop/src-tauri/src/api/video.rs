@@ -29,6 +29,9 @@ use crate::models::video::StudyResult;
 /// 循环中每次 sleep 的间隔秒数
 const LOOP_INTERVAL: f64 = 1.0;
 
+/// 模拟播放循环的最大运行时间（秒），防止服务器永不返回 isPassed 时无限循环
+const MAX_PLAY_LOOP_SECONDS: u64 = 7200;
+
 /// 缓存 rt 正则
 static RT_RE: OnceLock<Regex> = OnceLock::new();
 
@@ -281,8 +284,14 @@ pub async fn study_video(
     let mut forbidden_retry = 0u32;
     let max_forbidden_retry = 2u32;
     let mut current_dtoken = dtoken;
+    let loop_start = tokio::time::Instant::now();
 
     loop {
+        // 安全上限：防止服务器永不返回 isPassed 时无限循环
+        if loop_start.elapsed().as_secs() > MAX_PLAY_LOOP_SECONDS {
+            tracing::warn!("视频播放循环超过安全时限 ({}s)，强制退出: {}", MAX_PLAY_LOOP_SECONDS, job.name);
+            return Ok(StudyResult::Error);
+        }
         if !is_running.load(Ordering::SeqCst) {
             tracing::info!("视频任务已取消: {}", job.name);
             return Ok(StudyResult::Cancelled);

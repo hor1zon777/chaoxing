@@ -7,6 +7,7 @@ import {
   SwapOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import { invoke } from "@tauri-apps/api/core";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 import { useCourseStore } from "../../stores/courseStore";
@@ -85,6 +86,9 @@ export function AppLayout() {
   const pageMeta = getPageTitle(location.pathname);
 
   const handleSwitchAccount = async () => {
+    try {
+      await invoke("cancel_tasks");
+    } catch { /* 无运行中任务时忽略 */ }
     try {
       await logout();
     } finally {

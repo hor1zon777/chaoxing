@@ -132,6 +132,7 @@ export function TaskPage() {
   const [notopenAction, setNotopenAction] = useState<"retry" | "continue">(
     "retry",
   );
+  const [isActionPending, setIsActionPending] = useState(false);
 
   const {
     isRunning,
@@ -260,6 +261,8 @@ export function TaskPage() {
   ]);
 
   const handlePause = useCallback(async () => {
+    if (isActionPending) return;
+    setIsActionPending(true);
     try {
       await invoke("pause_tasks");
       setPaused(true);
@@ -267,10 +270,14 @@ export function TaskPage() {
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       addLog("error", `暂停失败: ${errorMsg}`);
+    } finally {
+      setIsActionPending(false);
     }
-  }, [setPaused, addLog]);
+  }, [isActionPending, setPaused, addLog]);
 
   const handleResume = useCallback(async () => {
+    if (isActionPending) return;
+    setIsActionPending(true);
     try {
       await invoke("resume_tasks");
       setPaused(false);
@@ -278,10 +285,14 @@ export function TaskPage() {
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       addLog("error", `恢复失败: ${errorMsg}`);
+    } finally {
+      setIsActionPending(false);
     }
-  }, [setPaused, addLog]);
+  }, [isActionPending, setPaused, addLog]);
 
   const handleStop = useCallback(async () => {
+    if (isActionPending) return;
+    setIsActionPending(true);
     try {
       await invoke("cancel_tasks");
       setRunning(false);
@@ -291,8 +302,10 @@ export function TaskPage() {
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       addLog("error", `停止失败: ${errorMsg}`);
+    } finally {
+      setIsActionPending(false);
     }
-  }, [setRunning, setPaused, addLog]);
+  }, [isActionPending, setRunning, setPaused, addLog]);
 
   const filteredLogs = useMemo(() => {
     if (logFilter === "all") return logs;
@@ -443,6 +456,8 @@ export function TaskPage() {
                   <Button
                     icon={<PlayCircleOutlined />}
                     onClick={handleResume}
+                    loading={isActionPending}
+                    disabled={isActionPending}
                     style={{ ...primaryActionButtonStyle, minWidth: 110 }}
                   >
                     继续
@@ -451,6 +466,8 @@ export function TaskPage() {
                   <Button
                     icon={<PauseCircleOutlined />}
                     onClick={handlePause}
+                    loading={isActionPending}
+                    disabled={isActionPending}
                     style={{ ...primaryActionButtonStyle, minWidth: 110 }}
                   >
                     暂停
@@ -460,6 +477,8 @@ export function TaskPage() {
                   danger
                   icon={<StopOutlined />}
                   onClick={handleStop}
+                  loading={isActionPending}
+                  disabled={isActionPending}
                   style={{ ...primaryActionButtonStyle, minWidth: 110 }}
                 >
                   停止

@@ -11,6 +11,7 @@ use tracing;
 
 use crate::api::client::HttpClient;
 use crate::error::AppError;
+use crate::models::events::TaskEvent;
 use crate::models::job::{Job, JobInfo};
 use crate::models::video::StudyResult;
 use crate::models::work::QuestionType;
@@ -37,6 +38,7 @@ pub async fn study_work(
     job: &Job,
     job_info: &JobInfo,
     tiku: &TikuManager,
+    event_tx: Option<&tokio::sync::mpsc::UnboundedSender<TaskEvent>>,
 ) -> Result<StudyResult, AppError> {
     if tiku.disabled {
         tracing::info!("题库未启用，跳过章节检测");
@@ -107,6 +109,16 @@ pub async fn study_work(
         answer_source_map.insert(q.id.clone(), source.to_string());
         answer_map.insert(q.id.clone(), answer.clone());
         tracing::info!("{} 填写答案为 {}", q.title, answer);
+
+        // 发送答题事件
+        if let Some(tx) = event_tx {
+            let _ = tx.send(TaskEvent::WorkQuestionAnswered {
+                course_id: course_id.to_string(),
+                question_title: q.title.clone(),
+                answer: answer.clone(),
+                source: source.to_string(),
+            });
+        }
     }
 
     let cover_rate = (found_answers as f64 / total_questions as f64) * 100.0;
@@ -124,7 +136,19 @@ pub async fn study_work(
     );
 
     // 提交答案
-    submit_work(client, &form_data, &py_flag).await
+    let result = submit_work(client, &form_data, &py_flag).await;
+
+    // 发送作业提交事件
+    if let Some(tx) = event_tx {
+        let _ = tx.send(TaskEvent::WorkSubmitted {
+            course_id: course_id.to_string(),
+            chapter_title: job.name.clone(),
+            cover_rate,
+            submitted: py_flag.is_empty(),
+        });
+    }
+
+    result
 }
 
 /// 获取题目页面并解析

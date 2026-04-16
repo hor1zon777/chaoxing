@@ -86,6 +86,17 @@ pub async fn process_chapter(
             return ChapterResult::Cancelled;
         }
 
+        // 发送 JobStarted 事件
+        if let Some(tx) = event_tx {
+            let _ = tx.send(TaskEvent::JobStarted {
+                course_id: course_id.to_string(),
+                chapter_id: point.id.clone(),
+                job_id: job.jobid.clone(),
+                job_name: job.name.clone(),
+                job_type: format!("{:?}", job.job_type),
+            });
+        }
+
         let result = process_job(
             client,
             course_id,
@@ -111,14 +122,45 @@ pub async fn process_chapter(
                 return ChapterResult::Cancelled;
             }
             Ok(r) if r.is_failure() => {
+                // 发送 JobFailed 事件
+                if let Some(tx) = event_tx {
+                    let _ = tx.send(TaskEvent::JobFailed {
+                        course_id: course_id.to_string(),
+                        chapter_id: point.id.clone(),
+                        job_id: job.jobid.clone(),
+                        job_name: job.name.clone(),
+                        error: format!("{:?}", r),
+                    });
+                }
                 tracing::warn!("任务失败: {}", job.name);
                 return ChapterResult::Error;
             }
             Err(e) => {
+                // 发送 JobFailed 事件
+                if let Some(tx) = event_tx {
+                    let _ = tx.send(TaskEvent::JobFailed {
+                        course_id: course_id.to_string(),
+                        chapter_id: point.id.clone(),
+                        job_id: job.jobid.clone(),
+                        job_name: job.name.clone(),
+                        error: e.to_string(),
+                    });
+                }
                 tracing::error!("任务异常: {}", e);
                 return ChapterResult::Error;
             }
-            _ => {}
+            Ok(_) => {
+                // 发送 JobCompleted 事件
+                if let Some(tx) = event_tx {
+                    let _ = tx.send(TaskEvent::JobCompleted {
+                        course_id: course_id.to_string(),
+                        chapter_id: point.id.clone(),
+                        job_id: job.jobid.clone(),
+                        job_name: job.name.clone(),
+                        job_type: format!("{:?}", job.job_type),
+                    });
+                }
+            }
         }
     }
 

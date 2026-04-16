@@ -46,12 +46,11 @@ pub async fn start_course_tasks(
         }
     });
 
-    // 重入保护：防止重复启动
-    if state.is_running.load(Ordering::SeqCst) {
+    // 重入保护：原子 CAS 防止并发启动
+    if state.is_running.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
         return Err(AppError::Other("任务已在运行中".to_string()));
     }
 
-    state.is_running.store(true, Ordering::SeqCst);
     state.is_paused.store(false, Ordering::SeqCst);
     let scheduler = TaskScheduler::new(state.is_running.clone(), state.is_paused.clone());
 
@@ -138,6 +137,11 @@ pub async fn start_course_tasks(
         {
             Ok(tree) => tree,
             Err(e) => {
+                let _ = tx.send(TaskEvent::CourseError {
+                    course_id: course.course_id.clone(),
+                    course_title: course.title.clone(),
+                    error: e.to_string(),
+                });
                 task_error = Some(e);
                 break 'outer;
             }
@@ -177,6 +181,11 @@ pub async fn start_course_tasks(
             )
             .await
         {
+            let _ = tx.send(TaskEvent::CourseError {
+                course_id: course.course_id.clone(),
+                course_title: course.title.clone(),
+                error: e.to_string(),
+            });
             task_error = Some(e);
             break 'outer;
         }

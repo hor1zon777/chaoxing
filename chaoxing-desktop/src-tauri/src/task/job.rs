@@ -88,7 +88,7 @@ pub async fn process_job(
             tracing::info!("识别到章节检测: {}", job.name);
             match tiku {
                 Some(tiku_mgr) => {
-                    work::study_work(client, course_id, clazz_id, cpi, job, job_info, tiku_mgr)
+                    work::study_work(client, course_id, clazz_id, cpi, job, job_info, tiku_mgr, event_tx)
                         .await
                 }
                 None => {

@@ -51,13 +51,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   logFilter: "all",
 
   handleTaskEvent: (event: TaskEvent) => {
-    const { courseProgress, addLog } = get();
+    const { addLog } = get();
 
     switch (event.type) {
       case "courseStarted": {
-        set({
+        set((state) => ({
           courseProgress: {
-            ...courseProgress,
+            ...state.courseProgress,
             [event.courseId]: {
               courseId: event.courseId,
               courseTitle: event.courseTitle,
@@ -66,7 +66,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               status: "running",
             },
           },
-        });
+        }));
         addLog(
           "info",
           `开始学习: ${event.courseTitle} (${event.totalChapters} 章节)`,
@@ -75,33 +75,35 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       case "courseCompleted": {
-        const prev = courseProgress[event.courseId];
-        if (prev) {
-          set({
+        set((state) => {
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return {};
+          return {
             courseProgress: {
-              ...courseProgress,
+              ...state.courseProgress,
               [event.courseId]: {
                 ...prev,
                 status: "completed",
                 completedChapters: prev.totalChapters,
               },
             },
-          });
-        }
+          };
+        });
         addLog("info", `课程完成: ${event.courseTitle}`);
         break;
       }
 
       case "courseError": {
-        const prev = courseProgress[event.courseId];
-        if (prev) {
-          set({
+        set((state) => {
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return {};
+          return {
             courseProgress: {
-              ...courseProgress,
+              ...state.courseProgress,
               [event.courseId]: { ...prev, status: "error" },
             },
-          });
-        }
+          };
+        });
         addLog("error", `课程出错: ${event.courseTitle} - ${event.error}`);
         break;
       }
@@ -115,35 +117,37 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       case "chapterCompleted": {
-        const prev = courseProgress[event.courseId];
-        if (prev) {
-          set({
+        set((state) => {
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return {};
+          return {
             courseProgress: {
-              ...courseProgress,
+              ...state.courseProgress,
               [event.courseId]: {
                 ...prev,
                 completedChapters: prev.completedChapters + 1,
               },
             },
-          });
-        }
+          };
+        });
         addLog("info", `章节完成: ${event.chapterTitle}`);
         break;
       }
 
       case "chapterSkipped": {
-        const prev = courseProgress[event.courseId];
-        if (prev) {
-          set({
+        set((state) => {
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return {};
+          return {
             courseProgress: {
-              ...courseProgress,
+              ...state.courseProgress,
               [event.courseId]: {
                 ...prev,
                 completedChapters: prev.completedChapters + 1,
               },
             },
-          });
-        }
+          };
+        });
         addLog("warn", `章节跳过: ${event.chapterTitle} (${event.reason})`);
         break;
       }
@@ -160,10 +164,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
       case "jobCompleted": {
         // 任务完成后移除对应的视频进度
-        const { videoProgress } = get();
-        const { [event.jobId]: _removed, ...restVideoProgress } =
-          videoProgress;
-        set({ videoProgress: restVideoProgress });
+        set((state) => {
+          const { [event.jobId]: _removed, ...restVideoProgress } =
+            state.videoProgress;
+          return { videoProgress: restVideoProgress };
+        });
         addLog("info", `任务完成: ${event.jobName}`);
         break;
       }
@@ -174,10 +179,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       case "videoProgress": {
-        const { videoProgress } = get();
-        set({
+        set((state) => ({
           videoProgress: {
-            ...videoProgress,
+            ...state.videoProgress,
             [event.jobId]: {
               jobId: event.jobId,
               jobName: event.jobName,
@@ -185,15 +189,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               totalDuration: event.totalDuration,
             },
           },
-        });
+        }));
         break;
       }
 
       case "liveProgress": {
-        const { videoProgress } = get();
-        set({
+        set((state) => ({
           videoProgress: {
-            ...videoProgress,
+            ...state.videoProgress,
             [event.jobId]: {
               jobId: event.jobId,
               jobName: event.jobName,
@@ -201,7 +204,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               totalDuration: event.totalMinutes,
             },
           },
-        });
+        }));
         break;
       }
 

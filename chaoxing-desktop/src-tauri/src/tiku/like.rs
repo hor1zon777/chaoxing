@@ -371,8 +371,10 @@ impl TikuLike {
     }
 
     /// 更新所有 token 的余额
+    ///
+    /// 先并发获取所有余额（不持锁），再短暂持写锁批量更新
     async fn update_all_balances(&self) {
-        let mut balance_map = self.balance.write().await;
+        let mut results = Vec::with_capacity(self.tokens.len());
         for token in &self.tokens {
             let bal = self.get_api_balance(token).await;
             tracing::info!(
@@ -380,7 +382,11 @@ impl TikuLike {
                 &token[token.len().saturating_sub(5)..],
                 bal
             );
-            balance_map.insert(token.clone(), bal);
+            results.push((token.clone(), bal));
+        }
+        let mut balance_map = self.balance.write().await;
+        for (token, bal) in results {
+            balance_map.insert(token, bal);
         }
     }
 
