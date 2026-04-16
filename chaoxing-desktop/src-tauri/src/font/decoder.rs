@@ -89,7 +89,7 @@ impl FontDecoder {
 
         for ch in text.chars() {
             let unicode = ch as u32;
-            let glyph_name = format!("uni{:X}", unicode);
+            let glyph_name = format!("uni{:04X}", unicode);
 
             // 在目标字体映射中查找该字符的哈希
             if let Some(hash) = self.font_map.get(&glyph_name) {

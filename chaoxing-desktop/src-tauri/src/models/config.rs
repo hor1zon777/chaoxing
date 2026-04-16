@@ -111,6 +111,35 @@ fn default_true() -> bool {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        serde_json::from_str("{}").unwrap()
+        Self {
+            speed: default_speed(),
+            jobs: default_jobs(),
+            notopen_action: default_notopen_action(),
+            tiku_provider: String::new(),
+            tiku_tokens: String::new(),
+            tiku_submit: false,
+            tiku_cover_rate: default_cover_rate(),
+            tiku_delay: default_delay(),
+            ai_endpoint: String::new(),
+            ai_key: String::new(),
+            ai_model: String::new(),
+            ai_proxy: String::new(),
+            ai_min_interval: default_ai_interval(),
+            siliconflow_key: String::new(),
+            siliconflow_model: default_sf_model(),
+            siliconflow_endpoint: default_sf_endpoint(),
+            like_search: false,
+            like_vision: default_true(),
+            like_model: default_like_model(),
+            like_retry: default_true(),
+            like_retry_times: default_retry_times(),
+            tiku_adapter_url: String::new(),
+            true_list: default_true_list(),
+            false_list: default_false_list(),
+            notification_provider: String::new(),
+            notification_url: String::new(),
+            notification_tg_chat_id: String::new(),
+            check_llm_connection: default_true(),
+        }
     }
 }

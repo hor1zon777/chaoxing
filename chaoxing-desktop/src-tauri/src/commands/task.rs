@@ -7,6 +7,7 @@
 //! - cancel_tasks: 取消任务
 
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use tauri::ipc::Channel;
 use tauri::State;
@@ -32,8 +33,10 @@ pub async fn start_course_tasks(
     jobs: u32,
     notopen_action: String,
 ) -> Result<(), AppError> {
-    let client_lock = state.client.read().await;
-    let client = client_lock.as_ref().ok_or(AppError::Unauthorized)?;
+    let client = {
+        let client_lock = state.client.read().await;
+        client_lock.as_ref().ok_or(AppError::Unauthorized)?.clone()
+    };
 
     let (tx, mut rx) = mpsc::unbounded_channel::<TaskEvent>();
 
@@ -43,12 +46,41 @@ pub async fn start_course_tasks(
         }
     });
 
+    // 重入保护：防止重复启动
+    if state.is_running.load(Ordering::SeqCst) {
+        return Err(AppError::Other("任务已在运行中".to_string()));
+    }
+
     state.is_running.store(true, Ordering::SeqCst);
     state.is_paused.store(false, Ordering::SeqCst);
     let scheduler = TaskScheduler::new(state.is_running.clone(), state.is_paused.clone());
 
+    let original_speed = speed;
+    let original_jobs = jobs;
     let speed = speed.clamp(1.0, 2.0);
     let jobs = jobs.clamp(1, 8);
+
+    if (original_speed - speed).abs() > f64::EPSILON {
+        let _ = tx.send(TaskEvent::Log {
+            level: "warn".to_string(),
+            message: format!(
+                "播放速度 {} 超出允许范围，已自动调整为 {}",
+                original_speed, speed
+            ),
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+        });
+    }
+
+    if original_jobs != jobs {
+        let _ = tx.send(TaskEvent::Log {
+            level: "warn".to_string(),
+            message: format!(
+                "并发任务数 {} 超出允许范围，已自动调整为 {}",
+                original_jobs, jobs
+            ),
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+        });
+    }
 
     let config = state.config.read().await;
     let tiku = TikuManager::from_config(&config);
@@ -70,9 +102,12 @@ pub async fn start_course_tasks(
         drop(config_check);
     }
 
-    let tiku_ref = if tiku.disabled { None } else { Some(&tiku) };
+    let tiku_ref = if tiku.disabled { None } else { Some(Arc::new(tiku)) };
 
-    for course in &courses {
+    // 错误收集：确保 cleanup 代码始终执行
+    let mut task_error: Option<AppError> = None;
+
+    'outer: for course in &courses {
         if !state.is_running.load(Ordering::SeqCst) {
             break;
         }
@@ -93,8 +128,21 @@ pub async fn start_course_tasks(
             timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
         });
 
-        let chapter_tree =
-            get_course_point(client, &course.course_id, &course.clazz_id, &course.cpi).await?;
+        let chapter_tree = match get_course_point(
+            &client,
+            &course.course_id,
+            &course.clazz_id,
+            &course.cpi,
+        )
+        .await
+        {
+            Ok(tree) => tree,
+            Err(e) => {
+                task_error = Some(e);
+                break 'outer;
+            }
+        };
+
         let selected_chapters = chapter_tree
             .points
             .iter()
@@ -113,9 +161,9 @@ pub async fn start_course_tasks(
             total_chapters: selected_chapters.len() as u32,
         });
 
-        scheduler
+        if let Err(e) = scheduler
             .run_course(
-                client,
+                &client,
                 &course.course_id,
                 &course.clazz_id,
                 &course.cpi,
@@ -124,10 +172,14 @@ pub async fn start_course_tasks(
                 speed,
                 jobs,
                 &notopen_action,
-                tiku_ref,
+                tiku_ref.clone(),
                 &tx,
             )
-            .await?;
+            .await
+        {
+            task_error = Some(e);
+            break 'outer;
+        }
 
         if !state.is_running.load(Ordering::SeqCst) {
             break;
@@ -139,13 +191,18 @@ pub async fn start_course_tasks(
         });
     }
 
+    // Cleanup 始终执行，无论是否发生错误
     let was_cancelled = !state.is_running.load(Ordering::SeqCst);
     state.is_running.store(false, Ordering::SeqCst);
     state.is_paused.store(false, Ordering::SeqCst);
-    if !was_cancelled {
+    if !was_cancelled && task_error.is_none() {
         let _ = tx.send(TaskEvent::AllTasksCompleted);
     }
-    Ok(())
+
+    match task_error {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }
 
 #[tauri::command]

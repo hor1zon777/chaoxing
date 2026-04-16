@@ -9,7 +9,10 @@ impl ServerChan {
     pub fn new(url: &str) -> Self {
         Self {
             url: url.to_string(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -27,9 +30,15 @@ impl ServerChan {
             .await?;
         if resp.status().is_success() {
             tracing::info!("Server酱通知发送成功");
+            Ok(())
         } else {
-            tracing::error!("Server酱通知发送失败: {}", resp.status());
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!("Server酱通知发送失败: {} - {}", status, body);
+            Err(AppError::Notification(format!(
+                "Server酱通知发送失败: HTTP {}",
+                status
+            )))
         }
-        Ok(())
     }
 }

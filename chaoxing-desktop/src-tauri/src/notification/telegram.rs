@@ -11,7 +11,10 @@ impl Telegram {
         Self {
             url: url.to_string(),
             chat_id: chat_id.to_string(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -31,12 +34,25 @@ impl Telegram {
             let json: serde_json::Value = resp.json().await.unwrap_or_default();
             if json["ok"].as_bool() == Some(true) {
                 tracing::info!("Telegram通知发送成功");
+                Ok(())
             } else {
-                tracing::error!("Telegram通知发送失败: {:?}", json);
+                let desc = json["description"]
+                    .as_str()
+                    .unwrap_or("未知错误");
+                tracing::error!("Telegram通知发送失败: {}", desc);
+                Err(AppError::Notification(format!(
+                    "Telegram通知发送失败: {}",
+                    desc
+                )))
             }
         } else {
-            tracing::error!("Telegram通知发送失败: {}", resp.status());
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!("Telegram通知发送失败: {} - {}", status, body);
+            Err(AppError::Notification(format!(
+                "Telegram通知发送失败: HTTP {}",
+                status
+            )))
         }
-        Ok(())
     }
 }

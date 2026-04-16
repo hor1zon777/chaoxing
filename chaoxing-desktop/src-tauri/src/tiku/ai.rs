@@ -39,16 +39,31 @@ impl TikuAi {
     /// 从配置创建
     pub fn new(endpoint: &str, key: &str, model: &str, proxy: &str, min_interval: u32) -> Self {
         let client = if !proxy.is_empty() {
-            Client::builder()
-                .proxy(reqwest::Proxy::all(proxy).expect("AI 代理配置无效"))
-                .timeout(std::time::Duration::from_secs(120))
-                .build()
-                .expect("创建 AI HTTP 客户端失败")
+            match reqwest::Proxy::all(proxy) {
+                Ok(p) => Client::builder()
+                    .proxy(p)
+                    .timeout(std::time::Duration::from_secs(120))
+                    .build()
+                    .unwrap_or_else(|e| {
+                        tracing::error!("创建带代理的 AI HTTP 客户端失败: {}，回退为无代理", e);
+                        Client::builder()
+                            .timeout(std::time::Duration::from_secs(120))
+                            .build()
+                            .unwrap_or_default()
+                    }),
+                Err(e) => {
+                    tracing::error!("AI 代理配置无效: {}，回退为无代理", e);
+                    Client::builder()
+                        .timeout(std::time::Duration::from_secs(120))
+                        .build()
+                        .unwrap_or_default()
+                }
+            }
         } else {
             Client::builder()
                 .timeout(std::time::Duration::from_secs(120))
                 .build()
-                .expect("创建 AI HTTP 客户端失败")
+                .unwrap_or_default()
         };
 
         Self {

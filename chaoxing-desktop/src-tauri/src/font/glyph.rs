@@ -442,7 +442,7 @@ mod tests {
         // 点2: x=0, y=100, flag=1 → "01001"
         // 拼接: "0011000101001"
         let expected_input = "0011000101001";
-        let mut hasher = md5::Md5::new();
+        let mut hasher = Md5::new();
         hasher.update(expected_input.as_bytes());
         let expected_hash = format!("{:x}", hasher.finalize());
         assert_eq!(hash, expected_hash);

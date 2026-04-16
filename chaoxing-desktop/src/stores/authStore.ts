@@ -194,13 +194,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   deleteSavedAccount: async (accountId: string) => {
-    const { savedAccounts, validateSession } = useAuthStore.getState();
-    await invoke("delete_saved_account", { accountId });
-    const nextAccounts = updateSavedAccounts(savedAccounts, accountId);
-    set({ savedAccounts: nextAccounts });
-    await validateSession();
-    if (!useAuthStore.getState().isLoggedIn) {
-      set({ notice: "已删除当前账号，请重新选择要登录的账户" });
+    try {
+      const { savedAccounts, validateSession } = useAuthStore.getState();
+      await invoke("delete_saved_account", { accountId });
+      const nextAccounts = updateSavedAccounts(savedAccounts, accountId);
+      set({ savedAccounts: nextAccounts });
+      await validateSession();
+      if (!useAuthStore.getState().isLoggedIn) {
+        set({ notice: "已删除当前账号，请重新选择要登录的账户" });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({ error: `删除账号失败: ${message}` });
     }
   },
 

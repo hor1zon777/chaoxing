@@ -160,9 +160,11 @@ impl TikuManager {
             .filter(|s| !s.is_empty())
             .collect();
 
-        // 缓存文件放在应用数据目录
-        let cache_path = std::env::current_dir()
-            .unwrap_or_default()
+        // 缓存文件放在可执行文件所在目录（Tauri 桌面应用中比 current_dir 更稳定）
+        let cache_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
             .join("cache.json");
 
         Self {

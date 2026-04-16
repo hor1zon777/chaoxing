@@ -17,6 +17,8 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("JSON错误: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("通知发送失败: {0}")]
+    Notification(String),
     #[error("任务取消")]
     Cancelled,
     #[error("{0}")]

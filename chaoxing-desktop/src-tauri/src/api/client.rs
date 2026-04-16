@@ -12,6 +12,7 @@ use crate::utils::rate_limiter::RateLimiter;
 
 const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36";
 
+#[derive(Clone)]
 pub struct HttpClient {
     pub client: Client,
     pub cookie_store: Arc<CookieStoreMutex>,
@@ -55,7 +56,13 @@ impl HttpClient {
 
     /// 从 cookie store 获取指定 cookie 的值
     pub fn get_cookie(&self, name: &str, domain: &str) -> Option<String> {
-        let store = self.cookie_store.lock().unwrap();
+        let store = match self.cookie_store.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                tracing::warn!("CookieStore mutex 已中毒，尝试恢复");
+                poisoned.into_inner()
+            }
+        };
         for cookie in store.iter_unexpired() {
             if cookie.name() == name && cookie.domain().map_or(false, |d| d.contains(domain)) {
                 return Some(cookie.value().to_string());
@@ -76,7 +83,13 @@ impl HttpClient {
     }
 
     pub fn export_cookies(&self) -> Vec<StoredCookie> {
-        let store = self.cookie_store.lock().unwrap();
+        let store = match self.cookie_store.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                tracing::warn!("CookieStore mutex 已中毒，尝试恢复");
+                poisoned.into_inner()
+            }
+        };
         store
             .iter_unexpired()
             .map(|cookie| StoredCookie {
@@ -89,7 +102,13 @@ impl HttpClient {
     }
 
     pub fn import_cookies(&self, cookies: &[StoredCookie]) -> Result<(), String> {
-        let mut store = self.cookie_store.lock().unwrap();
+        let mut store = match self.cookie_store.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                tracing::warn!("CookieStore mutex 已中毒，尝试恢复");
+                poisoned.into_inner()
+            }
+        };
         for cookie in cookies {
             let normalized_domain = if cookie.domain.is_empty() {
                 ".chaoxing.com".to_string()

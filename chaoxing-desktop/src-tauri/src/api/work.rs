@@ -22,7 +22,7 @@ use crate::tiku::TikuManager;
 static CLEAN_RE: OnceLock<Regex> = OnceLock::new();
 
 fn clean_re() -> &'static Regex {
-    CLEAN_RE.get_or_init(|| Regex::new(r"^[A-Za-z]|[.,!?;:，。！？；：]").unwrap())
+    CLEAN_RE.get_or_init(|| Regex::new(r"^[A-Za-z][.、]?\s*|[.,!?;:，。！？；：]+$").unwrap())
 }
 
 /// 学习作业/章节检测

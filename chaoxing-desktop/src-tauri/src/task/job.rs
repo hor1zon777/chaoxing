@@ -54,6 +54,9 @@ pub async fn process_job(
             )
             .await?;
 
+            if matches!(result, StudyResult::Cancelled) {
+                return Ok(result);
+            }
             if result.is_failure() {
                 tracing::warn!("视频模式失败，尝试音频模式: {}", job.name);
                 return video::study_video(

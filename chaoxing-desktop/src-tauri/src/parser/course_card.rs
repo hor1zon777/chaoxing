@@ -15,7 +15,7 @@ use crate::models::job::{Job, JobInfo, JobType};
 static MARG_RE: OnceLock<Regex> = OnceLock::new();
 
 fn marg_re() -> &'static Regex {
-    MARG_RE.get_or_init(|| Regex::new(r"mArg=\{(.*?)\};").unwrap())
+    MARG_RE.get_or_init(|| Regex::new(r"mArg\s*=\s*\{(.*?)\};").unwrap())
 }
 
 /// 解析任务点列表页面，提取任务列表和任务信息
@@ -33,9 +33,8 @@ pub fn parse_course_card(html_text: &str) -> Result<(Vec<Job>, JobInfo), AppErro
         return Ok((Vec::new(), JobInfo { not_open: true, ..Default::default() }));
     }
 
-    // 去空格后正则提取 mArg JSON
-    let cleaned = html_text.replace(' ', "");
-    let caps = match marg_re().captures(&cleaned) {
+    // 正则提取 mArg JSON（正则已支持空格，不再需要去空格）
+    let caps = match marg_re().captures(html_text) {
         Some(c) => c,
         None => return Ok((Vec::new(), JobInfo::default())),
     };

@@ -120,10 +120,12 @@ export function LoginPage() {
 
   const handlePasswordLogin = async (values: { username: string; password: string }) => {
     await login(values.username, values.password);
+    resetTaskRelatedState();
   };
 
   const handleCookieLogin = async (values: { cookies: string }) => {
     await loginWithCookies(values.cookies);
+    resetTaskRelatedState();
   };
 
   const handleSavedAccountLogin = async (accountId: string) => {

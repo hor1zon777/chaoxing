@@ -21,12 +21,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' https://*.chaoxing.com data:; connect-src 'self' https://*.chaoxing.com https://mooc1.chaoxing.com https://mooc1-api.chaoxing.com https://passport2.chaoxing.com; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; img-src 'self' https://*.chaoxing.com data:; connect-src 'self' https: http://localhost:*; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

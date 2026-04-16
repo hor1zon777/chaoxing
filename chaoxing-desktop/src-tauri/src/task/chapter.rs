@@ -66,7 +66,7 @@ pub async fn process_chapter(
         .map(|selection| selection.selected_job_ids.as_slice())
         .unwrap_or(&[]);
     let filtered_jobs = if selected_job_ids.is_empty() {
-        jobs
+        jobs.into_iter().filter(|job| !job.is_completed).collect()
     } else {
         jobs.into_iter()
             .filter(|job| {

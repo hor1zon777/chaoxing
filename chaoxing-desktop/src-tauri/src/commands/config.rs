@@ -9,12 +9,12 @@ use crate::models::config::AppConfig;
 use crate::state::AppState;
 
 /// 获取配置文件路径
-fn config_file_path(app: &tauri::AppHandle) -> PathBuf {
+async fn config_file_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
         .path()
         .app_config_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
-    std::fs::create_dir_all(&dir).ok();
+    tokio::fs::create_dir_all(&dir).await.ok();
     dir.join("config.json")
 }
 
@@ -34,9 +34,9 @@ pub async fn save_config(
     app: tauri::AppHandle,
     config: AppConfig,
 ) -> Result<(), AppError> {
-    let path = config_file_path(&app);
+    let path = config_file_path(&app).await;
     let json = serde_json::to_string_pretty(&config)?;
-    std::fs::write(&path, json)?;
+    tokio::fs::write(&path, json).await?;
     let mut current = state.config.write().await;
     *current = config;
     tracing::info!("配置已保存到 {:?}", path);
@@ -49,9 +49,9 @@ pub async fn load_config(
     state: State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<AppConfig, AppError> {
-    let path = config_file_path(&app);
+    let path = config_file_path(&app).await;
     if path.exists() {
-        let content = std::fs::read_to_string(&path)?;
+        let content = tokio::fs::read_to_string(&path).await?;
         let config: AppConfig = serde_json::from_str(&content).unwrap_or_default();
         let mut current = state.config.write().await;
         *current = config.clone();
@@ -68,9 +68,12 @@ pub async fn import_ini(
     app: tauri::AppHandle,
     path: String,
 ) -> Result<AppConfig, AppError> {
-    let mut ini = configparser::ini::Ini::new();
-    ini.load(&path)
+    let ini_content = tokio::fs::read_to_string(&path).await
         .map_err(|e| AppError::Config(format!("读取 INI 文件失败: {}", e)))?;
+
+    let mut ini = configparser::ini::Ini::new();
+    ini.read(ini_content)
+        .map_err(|e| AppError::Config(format!("解析 INI 文件失败: {}", e)))?;
 
     let mut config = AppConfig::default();
 
@@ -165,9 +168,9 @@ pub async fn import_ini(
     }
 
     // 保存
-    let json_path = config_file_path(&app);
+    let json_path = config_file_path(&app).await;
     let json = serde_json::to_string_pretty(&config)?;
-    std::fs::write(&json_path, json)?;
+    tokio::fs::write(&json_path, json).await?;
     let mut current = state.config.write().await;
     *current = config.clone();
 

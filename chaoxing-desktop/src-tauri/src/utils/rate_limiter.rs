@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
+#[derive(Clone)]
 pub struct RateLimiter {
     last_call: Arc<Mutex<Instant>>,
     call_interval: Duration,
