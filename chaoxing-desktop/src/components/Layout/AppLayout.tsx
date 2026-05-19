@@ -1,77 +1,32 @@
-import { Layout, Menu, Button, Dropdown, Space, Typography, type MenuProps } from "antd";
-import {
-  BookOutlined,
-  DownOutlined,
-  PlayCircleOutlined,
-  SettingOutlined,
-  SwapOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 import { useCourseStore } from "../../stores/courseStore";
 import { useTaskStore } from "../../stores/taskStore";
 
-const { Sider, Content, Header } = Layout;
-const { Title, Text } = Typography;
-
-const menuItems: MenuProps["items"] = [
-  {
-    type: "group",
-    label: "学习中心",
-    children: [
-      {
-        key: "/courses",
-        icon: <BookOutlined />,
-        label: "课程列表",
-      },
-      {
-        key: "/tasks",
-        icon: <PlayCircleOutlined />,
-        label: "任务执行",
-      },
-    ],
-  },
-  {
-    type: "group",
-    label: "系统设置",
-    children: [
-      {
-        key: "/settings",
-        icon: <SettingOutlined />,
-        label: "设置",
-      },
-    ],
-  },
+const navLinks = [
+  { key: "/courses", label: "课程" },
+  { key: "/tasks", label: "任务" },
+  { key: "/settings", label: "设置" },
 ];
 
-function getPageTitle(pathname: string) {
+interface PageMeta {
+  title: string;
+  description?: string;
+}
+
+function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith("/courses/") && pathname.endsWith("/tasks")) {
-    return {
-      title: "任务配置",
-      subtitle: "按任务类型筛选、勾选学习范围并返回课程列表。",
-    };
+    return { title: "任务配置", description: "按类型筛选并勾选学习范围" };
   }
-
   if (pathname.startsWith("/courses")) {
-    return {
-      title: "课程列表",
-      subtitle: "",
-    };
+    return { title: "课程" };
   }
-
   if (pathname.startsWith("/tasks")) {
-    return {
-      title: "任务执行",
-      subtitle: "",
-    };
+    return { title: "任务" };
   }
-
-  return {
-    title: "设置",
-    subtitle: "",
-  };
+  return { title: "设置" };
 }
 
 export function AppLayout() {
@@ -83,9 +38,31 @@ export function AppLayout() {
   const taskClearAll = useTaskStore((s) => s.clearAll);
   const isRunning = useTaskStore((s) => s.isRunning);
 
-  const pageMeta = getPageTitle(location.pathname);
+  const pageMeta = useMemo(() => getPageMeta(location.pathname), [location.pathname]);
+  const activeKey = useMemo(() => {
+    if (location.pathname.startsWith("/courses")) return "/courses";
+    if (location.pathname.startsWith("/tasks")) return "/tasks";
+    if (location.pathname.startsWith("/settings")) return "/settings";
+    return "";
+  }, [location.pathname]);
+
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [accountMenuOpen]);
 
   const handleSwitchAccount = async () => {
+    setAccountMenuOpen(false);
+    if (isRunning) return;
     try {
       await invoke("cancel_tasks");
     } catch { /* 无运行中任务时忽略 */ }
@@ -98,170 +75,192 @@ export function AppLayout() {
     }
   };
 
-  const accountMenuItems: MenuProps["items"] = [
-    {
-      key: "status",
-      disabled: true,
-      label: (
-        <Space size={8}>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#52c41a",
-              display: "inline-block",
-            }}
-          />
-          <span>已登录</span>
-        </Space>
-      ),
-    },
-    {
-      type: "divider",
-    },
-    {
-      key: "switch-account",
-      icon: <SwapOutlined />,
-      label: isRunning ? "任务执行中，暂不可切换账号" : "切换账号",
-      disabled: isRunning,
-    },
-  ];
-
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider
-        width={236}
-        theme="light"
+    <div className="apple-app">
+      {/* 白色顶栏 — 合并导航 + 页面标题 */}
+      <header
         style={{
-          borderRight: "1px solid #c8d8ee",
-          background: "linear-gradient(180deg, #eaf2fb 0%, #e2edf9 100%)",
-          boxShadow: "inset -1px 0 0 rgba(255,255,255,0.5)",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          background: "rgba(255, 255, 255, 0.84)",
+          backdropFilter: "saturate(180%) blur(20px)",
+          WebkitBackdropFilter: "saturate(180%) blur(20px)",
+          borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
         }}
       >
         <div
           style={{
-            padding: "20px 20px 16px",
-            borderBottom: "1px solid #d2dfef",
-            background: "linear-gradient(180deg, #eef5ff 0%, #e6effb 100%)",
-          }}
-        >
-          <Title level={4} style={{ margin: 0, fontSize: 20 }}>
-            超星助手
-          </Title>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            课程配置与任务学习
-          </Text>
-        </div>
-
-        <Menu
-          mode="inline"
-          selectedKeys={[
-            location.pathname.startsWith("/courses/") ? "/courses" : location.pathname,
-          ]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{ borderRight: 0, padding: "16px 12px", background: "transparent" }}
-        />
-
-        <div
-          style={{
-            margin: "0 12px 16px",
-            height: 1,
-            background: "linear-gradient(90deg, transparent 0%, #b7c7dd 18%, #b7c7dd 82%, transparent 100%)",
-          }}
-        />
-      </Sider>
-
-      <Layout>
-        <Header
-          style={{
-            height: 88,
-            padding: "0 24px",
-            background: "linear-gradient(180deg, #f3f7fd 0%, #edf3fb 100%)",
-            borderBottom: "1px solid #d6e2f0",
+            maxWidth: 1024,
+            margin: "0 auto",
+            padding: "0 22px",
+            height: 44,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 16,
+            gap: 24,
           }}
         >
-          <div style={{ transform: "translateY(-8px)" }}>
-            <Title level={3} style={{ margin: 0 }}>
-              {pageMeta.title}
-            </Title>
-            {pageMeta.subtitle ? <Text type="secondary">{pageMeta.subtitle}</Text> : null}
-          </div>
-
-          <Dropdown
-            trigger={["click"]}
-            menu={{
-              items: accountMenuItems,
-              onClick: ({ key }) => {
-                if (key === "switch-account") {
-                  void handleSwitchAccount();
-                }
-              },
-            }}
-          >
-            <Button
-              type="text"
+          {/* 左侧：应用名 + 页面标题 */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 20 }}>
+            <span
               style={{
-                height: "auto",
-                padding: "10px 14px",
-                borderRadius: 16,
-                border: "1px solid #d6e3f5",
-                background: "linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)",
-                boxShadow: "0 12px 24px rgba(37,99,235,0.08)",
+                fontFamily: "var(--apple-font-display)",
+                fontSize: 17,
+                fontWeight: 600,
+                letterSpacing: "-0.374px",
+                color: "var(--apple-color-ink)",
               }}
             >
-              <Space size={12} align="center">
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 12,
-                    background: "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
-                    color: "#1d4ed8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <UserOutlined />
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  <Text strong>{username || "当前账号"}</Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {isRunning ? "任务执行中，暂不可切换账号" : "已登录"}
-                  </Text>
-                </div>
-                <DownOutlined style={{ fontSize: 12, color: "#8c8c8c" }} />
-              </Space>
-            </Button>
-          </Dropdown>
-        </Header>
-
-        <Content
-          style={{
-            padding: 24,
-            background: "#edf3fb",
-            overflow: "auto",
-          }}
-        >
-          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-            <Outlet />
+              超星助手
+            </span>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: "var(--apple-font-display)",
+                fontSize: 17,
+                fontWeight: 600,
+                letterSpacing: "-0.374px",
+                color: "var(--apple-color-ink-muted-80)",
+              }}
+            >
+              {pageMeta.title}
+            </h1>
           </div>
-        </Content>
-      </Layout>
-    </Layout>
+
+          {/* 右侧：导航链接 + 账号 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            {navLinks.map((link) => (
+              <button
+                key={link.key}
+                type="button"
+                onClick={() => navigate(link.key)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  fontFamily: "var(--apple-font-text)",
+                  fontSize: 14,
+                  fontWeight: 400,
+                  letterSpacing: "-0.224px",
+                  color: activeKey === link.key ? "var(--apple-color-ink)" : "var(--apple-color-ink-muted-48)",
+                  cursor: "pointer",
+                  transition: "color 160ms ease",
+                }}
+              >
+                {link.label}
+              </button>
+            ))}
+
+            <div ref={accountMenuRef} style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((value) => !value)}
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--apple-color-canvas-parchment)",
+                  border: "1px solid var(--apple-color-hairline)",
+                  borderRadius: 9999,
+                  padding: "4px 14px",
+                  fontFamily: "var(--apple-font-text)",
+                  fontSize: 13,
+                  letterSpacing: "-0.12px",
+                  color: "var(--apple-color-ink-muted-80)",
+                  cursor: "pointer",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: isRunning ? "#a85d00" : "#1e7e34",
+                  }}
+                />
+                {username || "账号"}
+              </button>
+              {accountMenuOpen ? (
+                <div
+                  role="menu"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    right: 0,
+                    minWidth: 200,
+                    background: "var(--apple-color-canvas)",
+                    border: "1px solid var(--apple-color-hairline)",
+                    borderRadius: 11,
+                    padding: 10,
+                    boxShadow: "0 10px 32px rgba(0,0,0,0.12)",
+                    zIndex: 200,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "8px 10px 10px",
+                      borderBottom: "1px solid var(--apple-color-divider-soft)",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "var(--apple-font-text)",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        letterSpacing: "-0.224px",
+                        color: "var(--apple-color-ink)",
+                      }}
+                    >
+                      {username || "当前账号"}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "var(--apple-font-text)",
+                        fontSize: 12,
+                        letterSpacing: "-0.12px",
+                        color: "var(--apple-color-ink-muted-48)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {isRunning ? "任务执行中" : "已登录"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={isRunning}
+                    onClick={() => void handleSwitchAccount()}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      background: "transparent",
+                      border: "none",
+                      color: isRunning ? "var(--apple-color-ink-muted-48)" : "var(--apple-color-primary)",
+                      fontFamily: "var(--apple-font-text)",
+                      fontSize: 14,
+                      letterSpacing: "-0.224px",
+                      cursor: isRunning ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {isRunning ? "任务执行中，暂不可切换" : "切换账号"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <Outlet />
+      </main>
+    </div>
   );
 }

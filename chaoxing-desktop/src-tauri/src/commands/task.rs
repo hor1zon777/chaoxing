@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use tauri::ipc::Channel;
 use tauri::State;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Semaphore};
 
 use crate::api::course_point::get_course_point;
 use crate::error::AppError;
@@ -71,7 +71,6 @@ pub async fn start_course_tasks(
     };
 
     state.is_paused.store(false, Ordering::SeqCst);
-    let scheduler = TaskScheduler::new(state.is_running.clone(), state.is_paused.clone());
 
     let original_speed = speed;
     let original_jobs = jobs;
@@ -124,105 +123,140 @@ pub async fn start_course_tasks(
 
     let tiku_ref = if tiku.disabled || tiku_disabled_by_check { None } else { Some(Arc::new(tiku)) };
 
-    // 错误收集：确保 cleanup 代码始终执行
-    let mut task_error: Option<AppError> = None;
+    // 并发控制：使用 Semaphore 限制同时运行的课程数
+    let semaphore = Arc::new(Semaphore::new(jobs as usize));
+    let is_running = state.is_running.clone();
+    let is_paused = state.is_paused.clone();
+    let mut handles = Vec::new();
 
-    'outer: for course in &courses {
-        if !state.is_running.load(Ordering::SeqCst) {
+    for course in &courses {
+        if !is_running.load(Ordering::SeqCst) {
             break;
         }
 
-        let selected_points = course.selected_points.len();
-        let selected_jobs = course
-            .selected_points
-            .iter()
-            .map(|point| point.selected_job_ids.len())
-            .sum::<usize>();
+        let course = course.clone();
+        let client = client.clone();
+        let tx = tx.clone();
+        let tiku_ref = tiku_ref.clone();
+        let notopen_action = notopen_action.clone();
+        let semaphore = semaphore.clone();
+        let is_running = is_running.clone();
+        let is_paused = is_paused.clone();
 
-        let _ = tx.send(TaskEvent::Log {
-            level: "info".to_string(),
-            message: format!(
-                "开始学习课程: {} ({} 个章节，{} 个任务)",
-                course.title, selected_points, selected_jobs
-            ),
-            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
-        });
+        let handle = tokio::spawn(async move {
+            let _permit = semaphore.acquire_owned().await;
 
-        let chapter_tree = match get_course_point(
-            &client,
-            &course.course_id,
-            &course.clazz_id,
-            &course.cpi,
-        )
-        .await
-        {
-            Ok(tree) => tree,
-            Err(e) => {
+            let selected_points = course.selected_points.len();
+            let selected_jobs = course
+                .selected_points
+                .iter()
+                .map(|point| point.selected_job_ids.len())
+                .sum::<usize>();
+
+            let _ = tx.send(TaskEvent::Log {
+                level: "info".to_string(),
+                message: format!(
+                    "开始学习课程: {} ({} 个章节，{} 个任务)",
+                    course.title, selected_points, selected_jobs
+                ),
+                timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+            });
+
+            let chapter_tree = match get_course_point(
+                &client,
+                &course.course_id,
+                &course.clazz_id,
+                &course.cpi,
+            )
+            .await
+            {
+                Ok(tree) => tree,
+                Err(e) => {
+                    let _ = tx.send(TaskEvent::CourseError {
+                        course_id: course.course_id.clone(),
+                        course_title: course.title.clone(),
+                        error: e.to_string(),
+                    });
+                    is_running.store(false, Ordering::SeqCst);
+                    return Err(e);
+                }
+            };
+
+            let selected_chapters = chapter_tree
+                .points
+                .iter()
+                .filter(|point| {
+                    course
+                        .selected_points
+                        .iter()
+                        .any(|selected| selected.point_id == point.id)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let _ = tx.send(TaskEvent::CourseStarted {
+                course_id: course.course_id.clone(),
+                course_title: course.title.clone(),
+                total_chapters: selected_chapters.len() as u32,
+            });
+
+            let scheduler = TaskScheduler::new(is_running.clone(), is_paused.clone());
+
+            if let Err(e) = scheduler
+                .run_course(
+                    &client,
+                    &course.course_id,
+                    &course.clazz_id,
+                    &course.cpi,
+                    &selected_chapters,
+                    &course.selected_points,
+                    speed,
+                    &notopen_action,
+                    tiku_ref.clone(),
+                    &tx,
+                )
+                .await
+            {
                 let _ = tx.send(TaskEvent::CourseError {
                     course_id: course.course_id.clone(),
                     course_title: course.title.clone(),
                     error: e.to_string(),
                 });
-                task_error = Some(e);
-                break 'outer;
+                is_running.store(false, Ordering::SeqCst);
+                return Err(e);
             }
-        };
 
-        let selected_chapters = chapter_tree
-            .points
-            .iter()
-            .filter(|point| {
-                course
-                    .selected_points
-                    .iter()
-                    .any(|selected| selected.point_id == point.id)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+            if !is_running.load(Ordering::SeqCst) {
+                return Err(AppError::Other("任务已取消".to_string()));
+            }
 
-        let _ = tx.send(TaskEvent::CourseStarted {
-            course_id: course.course_id.clone(),
-            course_title: course.title.clone(),
-            total_chapters: selected_chapters.len() as u32,
-        });
-
-        if let Err(e) = scheduler
-            .run_course(
-                &client,
-                &course.course_id,
-                &course.clazz_id,
-                &course.cpi,
-                &selected_chapters,
-                &course.selected_points,
-                speed,
-                jobs,
-                &notopen_action,
-                tiku_ref.clone(),
-                &tx,
-            )
-            .await
-        {
-            let _ = tx.send(TaskEvent::CourseError {
+            let _ = tx.send(TaskEvent::CourseCompleted {
                 course_id: course.course_id.clone(),
                 course_title: course.title.clone(),
-                error: e.to_string(),
             });
-            task_error = Some(e);
-            break 'outer;
-        }
 
-        if !state.is_running.load(Ordering::SeqCst) {
-            break;
-        }
-
-        let _ = tx.send(TaskEvent::CourseCompleted {
-            course_id: course.course_id.clone(),
-            course_title: course.title.clone(),
+            Ok(())
         });
+
+        handles.push(handle);
+    }
+
+    // 等待所有课程任务完成
+    let mut task_error: Option<AppError> = None;
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(())) => { /* 课程成功完成 */ }
+            Ok(Err(e)) => {
+                task_error = Some(e);
+            }
+            Err(join_err) => {
+                task_error = Some(AppError::Other(format!("课程任务异常: {}", join_err)));
+            }
+        }
     }
 
     // _guard 的 Drop 会自动重置 is_running / is_paused
-    let was_cancelled = !state.is_running.load(Ordering::SeqCst);
+    let was_cancelled = !is_running.load(Ordering::SeqCst);
     if !was_cancelled && task_error.is_none() {
         let _ = tx.send(TaskEvent::AllTasksCompleted);
     }

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ConfigProvider, Result, Button, Spin } from "antd";
+import { ConfigProvider, Spin } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { useAuthStore } from "./stores/authStore";
 import { AppLayout } from "./components/Layout/AppLayout";
 import { LoginPage } from "./routes/LoginPage";
@@ -8,6 +9,7 @@ import { CoursesPage } from "./routes/CoursesPage";
 import { CourseTaskSelectPage } from "./routes/CourseTaskSelectPage";
 import { TaskPage } from "./routes/TaskPage";
 import { SettingsPage } from "./routes/SettingsPage";
+import { PillButton } from "./components/ui/appleUI";
 
 /** 路由守卫：未登录则跳转登录页 */
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -23,7 +25,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#edf3fb",
+          background: "var(--apple-color-canvas)",
         }}
       >
         <Spin size="large" tip="正在加载已保存账号..." />
@@ -37,19 +39,51 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** 404 页面 */
+/** 404 页面 - Apple 风格 hero tile */
 function NotFoundPage() {
   return (
-    <Result
-      status="404"
-      title="404"
-      subTitle="页面不存在"
-      extra={
-        <Button type="primary" onClick={() => window.history.back()}>
-          返回
-        </Button>
-      }
-    />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--apple-color-canvas)",
+        padding: 22,
+        flexDirection: "column",
+        textAlign: "center",
+        gap: 30,
+      }}
+    >
+      <span className="apple-eyebrow">404</span>
+      <h1
+        style={{
+          fontFamily: "var(--apple-font-display)",
+          fontSize: 56,
+          fontWeight: 600,
+          letterSpacing: "-0.28px",
+          lineHeight: 1.07,
+          margin: 0,
+        }}
+      >
+        页面不存在。
+      </h1>
+      <p
+        style={{
+          fontFamily: "var(--apple-font-display)",
+          fontSize: 28,
+          fontWeight: 400,
+          letterSpacing: "0.196px",
+          lineHeight: 1.14,
+          color: "var(--apple-color-ink-muted-80)",
+          margin: 0,
+          maxWidth: 520,
+        }}
+      >
+        我们没能在这里找到任何内容。
+      </p>
+      <PillButton onClick={() => window.history.back()}>返回上一页</PillButton>
+    </div>
   );
 }
 
@@ -66,26 +100,108 @@ function App() {
 
   return (
     <ConfigProvider
+      locale={zhCN}
       theme={{
         token: {
-          colorPrimary: "#2563eb",
-          colorInfo: "#2563eb",
-          colorSuccess: "#16a34a",
-          colorWarning: "#d97706",
-          colorError: "#dc2626",
-          colorLink: "#1d4ed8",
-          colorLinkHover: "#3b82f6",
-          borderRadius: 12,
-          colorBgLayout: "#edf3fb",
+          colorPrimary: "#0066cc",
+          colorInfo: "#0066cc",
+          colorSuccess: "#1e7e34",
+          colorWarning: "#a85d00",
+          colorError: "#c8261d",
+          colorLink: "#0066cc",
+          colorLinkHover: "#0071e3",
+          colorLinkActive: "#0066cc",
+          borderRadius: 11,
+          borderRadiusLG: 18,
+          borderRadiusSM: 8,
+          colorBgLayout: "#ffffff",
           colorBgContainer: "#ffffff",
-          colorBorderSecondary: "#d8e6f8",
+          colorBgElevated: "#ffffff",
+          colorBorder: "#e0e0e0",
+          colorBorderSecondary: "#f0f0f0",
+          colorText: "#1d1d1f",
+          colorTextSecondary: "#7a7a7a",
+          colorTextTertiary: "#7a7a7a",
+          fontFamily:
+            '"SF Pro Text", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+          fontSize: 17,
+          fontSizeLG: 17,
+          fontSizeSM: 14,
+          fontWeightStrong: 600,
+          controlHeight: 40,
+          controlHeightLG: 44,
+          lineHeight: 1.47,
         },
         components: {
           Button: {
-            primaryShadow: "0 10px 24px rgba(37,99,235,0.18)",
+            borderRadius: 9999,
+            controlHeight: 40,
+            controlHeightLG: 44,
+            fontWeight: 400,
+            primaryShadow: "none",
+            defaultShadow: "none",
+            defaultBg: "#ffffff",
+            defaultBorderColor: "#e0e0e0",
           },
           Card: {
+            borderRadiusLG: 18,
+            boxShadowTertiary: "none",
+            colorBorderSecondary: "#e0e0e0",
             headerBg: "transparent",
+            headerFontSize: 17,
+          },
+          Input: {
+            borderRadius: 11,
+            controlHeight: 44,
+            activeBorderColor: "#0071e3",
+            hoverBorderColor: "#0071e3",
+          },
+          Select: {
+            borderRadius: 11,
+            controlHeight: 44,
+          },
+          Tabs: {
+            inkBarColor: "#0066cc",
+            itemSelectedColor: "#0066cc",
+            itemActiveColor: "#0066cc",
+            itemHoverColor: "#0071e3",
+            titleFontSize: 17,
+          },
+          Form: {
+            labelFontSize: 14,
+            verticalLabelPadding: "0 0 6px",
+          },
+          Switch: {
+            colorPrimary: "#0066cc",
+          },
+          Tag: {
+            borderRadiusSM: 9999,
+          },
+          Segmented: {
+            borderRadius: 9999,
+            trackBg: "rgba(0, 0, 0, 0.06)",
+            itemSelectedBg: "#ffffff",
+            itemSelectedColor: "#1d1d1f",
+          },
+          Slider: {
+            railBg: "rgba(0, 0, 0, 0.10)",
+            railHoverBg: "rgba(0, 0, 0, 0.18)",
+            trackBg: "#0066cc",
+            trackHoverBg: "#0071e3",
+            handleColor: "#0066cc",
+            handleActiveColor: "#0071e3",
+          },
+          Empty: {
+            colorTextDescription: "#7a7a7a",
+          },
+          Progress: {
+            defaultColor: "#0066cc",
+          },
+          Alert: {
+            borderRadiusLG: 11,
+          },
+          Modal: {
+            borderRadiusLG: 18,
           },
         },
       }}

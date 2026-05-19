@@ -1,38 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  Empty,
-  List,
-  Select,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-  Grid,
-} from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { Alert, Checkbox, Empty, Spin } from "antd";
 import { useCourseStore } from "../stores/courseStore";
 import type { FlatCourseJob, JobType } from "../types/course";
-import {
-  GuideBanner,
-  pageTopBannerTexts,
-  panelStyle,
-  primaryActionButtonStyle,
-  SectionTitle,
-  SummaryMetric,
-  surfaceCardStyle,
-} from "../components/ui/pagePrimitives";
-
-const { Text, Title, Paragraph } = Typography;
-const { useBreakpoint } = Grid;
+import { Card, Chip, Eyebrow, Headline, Metric, PillButton, Tag, UtilityButton } from "../components/ui/appleUI";
 
 const quickSelectOptions: Array<{ label: string; types: JobType[] }> = [
   { label: "仅视频", types: ["video"] },
-  { label: "视频+阅读", types: ["video", "read"] },
+  { label: "视频 + 阅读", types: ["video", "read"] },
   { label: "全部任务", types: [] },
 ];
 
@@ -44,25 +19,24 @@ const jobTypeOptions: Array<{ label: string; value: JobType }> = [
   { label: "作业", value: "workid" },
 ];
 
-function getJobTypeColor(jobType: JobType): string {
+function getJobTypeTone(jobType: JobType) {
   switch (jobType) {
     case "video":
-      return "blue";
+      return "default" as const;
     case "document":
-      return "gold";
+      return "warning" as const;
     case "read":
-      return "geekblue";
+      return "neutral" as const;
     case "live":
-      return "purple";
+      return "danger" as const;
     case "workid":
-      return "cyan";
+      return "success" as const;
     default:
-      return "default";
+      return "default" as const;
   }
 }
 
 export function CourseTaskSelectPage() {
-  const screens = useBreakpoint();
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
   const [selectedJobTypes, setSelectedJobTypes] = useState<JobType[]>([]);
@@ -88,16 +62,12 @@ export function CourseTaskSelectPage() {
   );
 
   useEffect(() => {
-    if (!courseId || courses.length > 0) {
-      return;
-    }
+    if (!courseId || courses.length > 0) return;
     void fetchCourses();
   }, [courseId, courses.length, fetchCourses]);
 
   useEffect(() => {
-    if (course) {
-      void activateCourse(course);
-    }
+    if (course) void activateCourse(course);
   }, [course, activateCourse]);
 
   const flatJobs = useMemo(
@@ -106,17 +76,12 @@ export function CourseTaskSelectPage() {
   );
 
   const filteredJobs = useMemo(() => {
-    if (selectedJobTypes.length === 0) {
-      return flatJobs;
-    }
+    if (selectedJobTypes.length === 0) return flatJobs;
     return flatJobs.filter((job) => selectedJobTypes.includes(job.jobType));
   }, [flatJobs, selectedJobTypes]);
 
   const selectedJobKeys = useMemo(() => {
-    if (!course) {
-      return [] as string[];
-    }
-
+    if (!course) return [] as string[];
     return (
       learningSelections[course.id]?.selectedPoints.flatMap((point) =>
         point.selectedJobIds.map((jobId) => `${point.pointId}:${jobId}`),
@@ -124,189 +89,213 @@ export function CourseTaskSelectPage() {
     );
   }, [course, learningSelections]);
 
-  const selectedJobKeySet = useMemo(
-    () => new Set(selectedJobKeys),
-    [selectedJobKeys],
-  );
+  const selectedJobKeySet = useMemo(() => new Set(selectedJobKeys), [selectedJobKeys]);
 
   const filteredSelectedCount = useMemo(
-    () =>
-      filteredJobs.filter((job) => selectedJobKeySet.has(`${job.pointId}:${job.id}`)).length,
+    () => filteredJobs.filter((job) => selectedJobKeySet.has(`${job.pointId}:${job.id}`)).length,
     [filteredJobs, selectedJobKeySet],
   );
 
   const selectedJobCount = selectedJobKeys.length;
-  const completedJobCount = useMemo(
-    () => flatJobs.filter((job) => job.isCompleted).length,
-    [flatJobs],
-  );
+  const completedJobCount = useMemo(() => flatJobs.filter((job) => job.isCompleted).length, [flatJobs]);
   const pendingJobCount = flatJobs.length - completedJobCount;
-  const chapterCount = useMemo(
-    () => new Set(flatJobs.map((job) => job.pointId)).size,
-    [flatJobs],
-  );
+  const chapterCount = useMemo(() => new Set(flatJobs.map((job) => job.pointId)).size, [flatJobs]);
 
   const isLoading = coursesLoading || (course ? treeLoadingIds.includes(course.id) : false);
   const batchActionDisabled = isLoading || filteredJobs.length === 0;
 
+  const toggleType = (type: JobType) => {
+    setSelectedJobTypes((prev) =>
+      prev.includes(type) ? prev.filter((value) => value !== type) : [...prev, type],
+    );
+  };
+
   if (!courseId || (!course && !isLoading)) {
     return (
-      <Card style={surfaceCardStyle}>
-        <Empty description="课程不存在或已失效" />
-      </Card>
+      <div style={{ padding: "60px 22px", background: "var(--apple-color-canvas)" }}>
+        <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+          <Card>
+            <Empty description="课程不存在或已失效" />
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
+              <PillButton onClick={() => navigate("/courses")}>返回课程列表</PillButton>
+            </div>
+          </Card>
+        </div>
+      </div>
     );
   }
 
   if (!course) {
     return (
-      <Card style={surfaceCardStyle}>
-        <div style={{ textAlign: "center", padding: 40 }}>
-          <Spin size="large" tip="加载课程中..." />
-        </div>
-      </Card>
+      <div style={{ padding: "120px 22px", background: "var(--apple-color-canvas)", textAlign: "center" }}>
+        <Spin size="large" tip="加载课程中..." />
+      </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <GuideBanner text={pageTopBannerTexts.courseTasks} />
-
-      <Card style={surfaceCardStyle} styles={{ body: { padding: 24 } }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ maxWidth: 840 }}>
-            <Space wrap size={[8, 8]}>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate("/courses")}
-                style={{ borderRadius: 12 }}
-              >
-                返回课程列表
-              </Button>
-              <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                {course.courseTypeLabel}
-              </Tag>
-              <Tag
-                color="cyan"
-                style={{
-                  marginInlineEnd: 0,
-                  background: "#ecfeff",
-                  color: "#155e75",
-                  borderColor: "#a5f3fc",
-                }}
-              >
-                已选 {selectedJobCount} 个任务
-              </Tag>
-            </Space>
-
-            <Title level={4} style={{ margin: "14px 0 6px" }}>
-              {course.title}
-            </Title>
-            <Paragraph type="secondary" style={{ margin: 0, lineHeight: 1.7 }}>
-              教师：{course.teacher || "未知教师"}。可按类型筛选任务，并勾选需要学习的章节与任务点。
-            </Paragraph>
+    <div style={{ background: "var(--apple-color-canvas)", minHeight: "100%" }}>
+      {/* Hero */}
+      <section style={{ padding: "48px 22px 24px" }}>
+        <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+          <div style={{ marginBottom: 20 }}>
+            <UtilityButton light onClick={() => navigate("/courses")}>
+              ← 返回课程列表
+            </UtilityButton>
           </div>
-
-          <div
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <Tag>{course.courseTypeLabel}</Tag>
+            <Tag tone="neutral">教师 · {course.teacher || "未知"}</Tag>
+            {selectedJobCount > 0 ? <Tag tone="success">已选 {selectedJobCount} 个任务</Tag> : null}
+          </div>
+          <Eyebrow>任务配置</Eyebrow>
+          <Headline level="lg" style={{ marginTop: 8 }}>
+            {course.title}
+          </Headline>
+          <p
             style={{
-              ...panelStyle,
-              minWidth: screens.md ? 240 : "100%",
-              background: "linear-gradient(180deg, #eef6ff 0%, #ffffff 100%)",
-              border: "1px solid #bfd4ff",
+              fontFamily: "var(--apple-font-text)",
+              fontSize: 17,
+              color: "var(--apple-color-ink-muted-80)",
+              lineHeight: 1.47,
+              letterSpacing: "-0.374px",
+              margin: "14px 0 0",
+              maxWidth: 640,
             }}
           >
-            <Text strong style={{ display: "block", marginBottom: 8 }}>
-              当前筛选摘要
-            </Text>
-            <Text type="secondary" style={{ display: "block", fontSize: 12, lineHeight: 1.7 }}>
-              当前筛选 {filteredJobs.length} 个任务，已选 {filteredSelectedCount} 个。
-            </Text>
-            <Text type="secondary" style={{ display: "block", fontSize: 12, lineHeight: 1.7 }}>
-              总共 {chapterCount} 个章节 / {flatJobs.length} 个任务点。
-            </Text>
-            <Text type="secondary" style={{ display: "block", fontSize: 12, lineHeight: 1.7 }}>
-              快捷选择会直接按类型重置当前课程的任务勾选结果。
-            </Text>
-          </div>
-        </div>
+            按类型筛选任务，勾选需要学习的章节与任务点。选择会自动保存。
+          </p>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: screens.md ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
-            gap: 12,
-            marginTop: 20,
-          }}
-        >
-          <SummaryMetric label="章节数" value={`${chapterCount}`} hint="可配置章节" />
-          <SummaryMetric label="任务总数" value={`${flatJobs.length}`} hint="当前课程全部任务点" />
-          <SummaryMetric label="未完成" value={`${pendingJobCount}`} hint="可继续学习" />
-          <SummaryMetric label="已选任务" value={`${selectedJobCount}`} hint="将带入任务执行页" />
-        </div>
-      </Card>
-
-      {error && <Alert type="error" message={error} style={{ borderRadius: 12 }} />}
-
-      <Card
-        title={<SectionTitle title="筛选与批量操作" subtitle="先筛选，再对当前结果执行全选、反选或清空" />}
-        style={surfaceCardStyle}
-        styles={{ body: { padding: 18 } }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Metrics */}
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
+              marginTop: 32,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 16,
-              flexWrap: "wrap",
             }}
           >
-            <div style={{ minWidth: 260, flex: 1 }}>
-              <Text type="secondary" style={{ display: "block", marginBottom: 8, fontSize: 12 }}>
-                任务类型筛选
-              </Text>
-              <Select
-                mode="multiple"
-                allowClear
-                placeholder="筛选任务类型"
-                value={selectedJobTypes}
-                options={jobTypeOptions}
-                onChange={(value) => setSelectedJobTypes(value)}
-                disabled={isLoading}
-                style={{ width: "100%" }}
-                maxTagCount="responsive"
-              />
-            </div>
+            <Metric label="章节数" value={chapterCount} hint="可配置章节" />
+            <Metric label="任务总数" value={flatJobs.length} hint="当前课程全部任务点" />
+            <Metric label="未完成" value={pendingJobCount} hint="可继续学习" />
+            <Metric label="已选任务" value={selectedJobCount} hint="将带入任务执行页" />
+          </div>
+        </div>
+      </section>
 
-            <div style={{ minWidth: 260, flex: 1 }}>
-              <Text type="secondary" style={{ display: "block", marginBottom: 8, fontSize: 12 }}>
-                快捷选择
-              </Text>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                {quickSelectOptions.map((option) => (
-                  <Button
-                    key={option.label}
-                    disabled={isLoading}
-                    onClick={() => selectJobsByType(course, option.types)}
-                    style={{ borderRadius: 12 }}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
+      {error ? (
+        <section style={{ padding: "0 22px 24px" }}>
+          <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+            <Alert type="error" message={error} style={{ borderRadius: 11 }} />
+          </div>
+        </section>
+      ) : null}
+
+      {/* Filter chips */}
+      <section
+        style={{
+          padding: "16px 22px 24px",
+          borderTop: "1px solid var(--apple-color-divider-soft)",
+          background: "var(--apple-color-canvas)",
+        }}
+      >
+        <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+          <div style={{ marginBottom: 18 }}>
+            <span
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: "-0.224px",
+                color: "var(--apple-color-ink-muted-48)",
+                marginRight: 12,
+              }}
+            >
+              筛选类型
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 12,
+                color: "var(--apple-color-ink-muted-48)",
+                letterSpacing: "-0.12px",
+              }}
+            >
+              当前筛选 {filteredJobs.length} 个任务，已选 {filteredSelectedCount} 个
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {jobTypeOptions.map((option) => (
+              <Chip
+                key={option.value}
+                selected={selectedJobTypes.includes(option.value)}
+                disabled={isLoading}
+                onClick={() => toggleType(option.value)}
+              >
+                {option.label}
+              </Chip>
+            ))}
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <Button
+          <div
+            style={{
+              marginTop: 28,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: "-0.224px",
+                color: "var(--apple-color-ink-muted-48)",
+                marginRight: 4,
+              }}
+            >
+              快捷选择
+            </span>
+            {quickSelectOptions.map((option) => (
+              <UtilityButton
+                key={option.label}
+                light
+                disabled={isLoading}
+                onClick={() => selectJobsByType(course, option.types)}
+              >
+                {option.label}
+              </UtilityButton>
+            ))}
+            <UtilityButton light disabled={isLoading} onClick={() => selectAllJobsForCourse(course)}>
+              选择全部任务
+            </UtilityButton>
+          </div>
+
+          <div
+            style={{
+              marginTop: 18,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: "-0.224px",
+                color: "var(--apple-color-ink-muted-48)",
+                marginRight: 4,
+              }}
+            >
+              批量操作
+            </span>
+            <UtilityButton
+              light
               disabled={batchActionDisabled}
               onClick={() =>
                 batchUpdateJobsForCourse(
@@ -315,11 +304,11 @@ export function CourseTaskSelectPage() {
                   "select",
                 )
               }
-              style={{ borderRadius: 12 }}
             >
-              全选当前筛选
-            </Button>
-            <Button
+              全选当前
+            </UtilityButton>
+            <UtilityButton
+              light
               disabled={batchActionDisabled}
               onClick={() =>
                 batchUpdateJobsForCourse(
@@ -328,11 +317,11 @@ export function CourseTaskSelectPage() {
                   "invert",
                 )
               }
-              style={{ borderRadius: 12 }}
             >
-              反选当前筛选
-            </Button>
-            <Button
+              反选当前
+            </UtilityButton>
+            <UtilityButton
+              light
               disabled={batchActionDisabled}
               onClick={() =>
                 batchUpdateJobsForCourse(
@@ -341,123 +330,100 @@ export function CourseTaskSelectPage() {
                   "clear",
                 )
               }
-              style={{ borderRadius: 12 }}
             >
-              清空当前筛选
-            </Button>
-            <Button
-              disabled={isLoading}
-              onClick={() => selectAllJobsForCourse(course)}
-              style={{ borderRadius: 12 }}
-            >
-              选择全部任务
-            </Button>
+              清空当前
+            </UtilityButton>
           </div>
         </div>
-      </Card>
+      </section>
 
-      <Card
-        title={<SectionTitle title="章节任务列表" subtitle="逐项勾选任务点，已完成任务会自动禁用" />}
-        style={surfaceCardStyle}
-        styles={{ body: { padding: 18 } }}
-      >
-        {isLoading ? (
-          <div style={{ textAlign: "center", padding: 40 }}>
-            <Spin size="large" tip="加载任务中..." />
-          </div>
-        ) : filteredJobs.length === 0 ? (
-          <Empty
-            description={
-              selectedJobTypes.length === 0 ? "暂无可选任务" : "当前筛选下暂无任务"
-            }
-          />
-        ) : (
-          <List
-            itemLayout="horizontal"
-            dataSource={filteredJobs}
-            renderItem={(job: FlatCourseJob) => (
-              <List.Item key={`${job.pointId}-${job.id}`} style={{ padding: "10px 0" }}>
-                <div
-                  style={{
-                    ...panelStyle,
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Checkbox
-                    checked={selectedJobKeySet.has(`${job.pointId}:${job.id}`)}
-                    disabled={job.isCompleted}
-                    onChange={(e) =>
-                      toggleJobSelection(
-                        course,
-                        job.pointId,
-                        job.id,
-                        e.target.checked,
-                      )
-                    }
-                    style={{ flex: 1, minWidth: 240 }}
+      {/* Job list */}
+      <section style={{ padding: "8px 22px 96px", background: "var(--apple-color-canvas)" }}>
+        <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+          {isLoading ? (
+            <div style={{ textAlign: "center", padding: 60 }}>
+              <Spin size="large" tip="加载任务中..." />
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <Card>
+              <Empty
+                description={selectedJobTypes.length === 0 ? "暂无可选任务" : "当前筛选下暂无任务"}
+              />
+            </Card>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {filteredJobs.map((job: FlatCourseJob) => {
+                const checked = selectedJobKeySet.has(`${job.pointId}:${job.id}`);
+                return (
+                  <div
+                    key={`${job.pointId}-${job.id}`}
+                    style={{
+                      border: "1px solid var(--apple-color-hairline)",
+                      borderRadius: 18,
+                      padding: "16px 20px",
+                      background: "var(--apple-color-canvas)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      flexWrap: "wrap",
+                      transition: "border-color 160ms ease",
+                      borderColor: checked
+                        ? "var(--apple-color-primary-focus)"
+                        : "var(--apple-color-hairline)",
+                    }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <Text strong style={{ lineHeight: 1.6 }}>
-                        {job.name}
-                      </Text>
-                      <Space size={[8, 8]} wrap>
-                        {job.isCompleted ? (
-                          <Tag color="success" style={{ marginInlineEnd: 0 }}>
-                            已完成
-                          </Tag>
-                        ) : (
-                          <Tag
-                            style={{
-                              marginInlineEnd: 0,
-                              background: "#eff6ff",
-                              color: "#1d4ed8",
-                              borderColor: "#bfdbfe",
-                            }}
-                          >
-                            未完成
-                          </Tag>
-                        )}
-                        {job.needUnlock && (
-                          <Tag color="orange" style={{ marginInlineEnd: 0 }}>
-                            待开放
-                          </Tag>
-                        )}
-                        {job.hasFinished && (
-                          <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                            章节已完成
-                          </Tag>
-                        )}
-                        <Tag
-                          bordered={false}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flex: 1, minWidth: 240 }}>
+                      <Checkbox
+                        checked={checked}
+                        disabled={job.isCompleted}
+                        onChange={(event) =>
+                          toggleJobSelection(course, job.pointId, job.id, event.target.checked)
+                        }
+                        style={{ marginTop: 4 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
                           style={{
-                            marginInlineEnd: 0,
-                            background: "#f8fafc",
-                            color: "#475569",
+                            fontFamily: "var(--apple-font-text)",
+                            fontSize: 17,
+                            fontWeight: 600,
+                            letterSpacing: "-0.374px",
+                            color: "var(--apple-color-ink)",
+                            lineHeight: 1.4,
+                            wordBreak: "break-word",
                           }}
                         >
-                          {job.pointTitle}
-                        </Tag>
-                      </Space>
+                          {job.name}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                          {job.isCompleted ? (
+                            <Tag tone="success">已完成</Tag>
+                          ) : (
+                            <Tag>未完成</Tag>
+                          )}
+                          {job.needUnlock ? <Tag tone="warning">待开放</Tag> : null}
+                          {job.hasFinished ? <Tag tone="neutral">章节已完成</Tag> : null}
+                          <Tag tone="neutral">{job.pointTitle}</Tag>
+                        </div>
+                      </div>
                     </div>
-                  </Checkbox>
-                  <Tag color={getJobTypeColor(job.jobType)} style={{ marginInlineEnd: 0 }}>
-                    {job.typeLabel}
-                  </Tag>
-                </div>
-              </List.Item>
-            )}
-          />
-        )}
-      </Card>
+                    <Tag tone={getJobTypeTone(job.jobType)}>{job.typeLabel}</Tag>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
 
-      <Card style={surfaceCardStyle} styles={{ body: { padding: "16px 20px" } }}>
+      {/* Sticky bottom action */}
+      <div className="apple-sticky-bar">
         <div
           style={{
+            maxWidth: 1024,
+            margin: "0 auto",
+            width: "100%",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -466,19 +432,32 @@ export function CourseTaskSelectPage() {
           }}
         >
           <div>
-            <Text strong style={{ display: "block" }}>
+            <div
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 17,
+                fontWeight: 600,
+                letterSpacing: "-0.374px",
+                color: "var(--apple-color-ink)",
+              }}
+            >
               已选择 {selectedJobCount} 个任务点
-            </Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              选择会自动保存，可直接返回课程列表，后续再前往任务执行页开始学习
-            </Text>
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--apple-font-text)",
+                fontSize: 12,
+                letterSpacing: "-0.12px",
+                color: "var(--apple-color-ink-muted-48)",
+                marginTop: 2,
+              }}
+            >
+              选择已自动保存
+            </div>
           </div>
-          <Button type="primary" onClick={() => navigate("/courses")} style={{ ...primaryActionButtonStyle }}>
-            返回课程列表
-          </Button>
+          <PillButton onClick={() => navigate("/courses")}>返回课程列表</PillButton>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
-

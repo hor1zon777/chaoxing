@@ -42,7 +42,6 @@ impl TaskScheduler {
         points: &[ChapterPoint],
         point_selections: &[CoursePointSelection],
         speed: f64,
-        _jobs: u32,
         notopen_action: &str,
         tiku: Option<Arc<TikuManager>>,
         event_tx: &mpsc::UnboundedSender<TaskEvent>,
