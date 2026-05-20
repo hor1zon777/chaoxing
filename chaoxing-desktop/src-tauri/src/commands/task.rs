@@ -105,6 +105,7 @@ pub async fn start_course_tasks(
 
     let config = state.config.read().await;
     let tiku = TikuManager::from_config(&config);
+    let tasks_per_chapter = config.tasks_per_chapter.clamp(1, 8);
     drop(config);
 
     tiku.init().await;
@@ -146,6 +147,7 @@ pub async fn start_course_tasks(
         let semaphore = semaphore.clone();
         let is_running = is_running.clone();
         let is_paused = is_paused.clone();
+        let tasks_per_chapter = tasks_per_chapter;
 
         let handle = tokio::spawn(async move {
             let _permit = semaphore.acquire_owned().await;
@@ -217,6 +219,7 @@ pub async fn start_course_tasks(
                     speed,
                     &notopen_action,
                     tiku_ref.clone(),
+                    tasks_per_chapter,
                     &tx,
                 )
                 .await

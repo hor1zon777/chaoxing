@@ -44,6 +44,7 @@ impl TaskScheduler {
         speed: f64,
         notopen_action: &str,
         tiku: Option<Arc<TikuManager>>,
+        tasks_per_chapter: u32,
         event_tx: &mpsc::UnboundedSender<TaskEvent>,
     ) -> Result<(), AppError> {
         let max_retries = 5u32;
@@ -90,7 +91,8 @@ impl TaskScheduler {
                     point,
                     point_selection,
                     speed,
-                    tiku.as_deref(),
+                    tiku.as_ref(),
+                    tasks_per_chapter,
                     Some(event_tx),
                     &self.is_running,
                     &self.is_paused,

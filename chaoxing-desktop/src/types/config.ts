@@ -4,6 +4,8 @@ export interface AppConfig {
   speed: number;
   /** 任务数量 */
   jobs: number;
+  /** 单门课程内章节里同时并行的任务数 */
+  tasksPerChapter: number;
   /** 未开放操作: 重试或继续 */
   notopenAction: "retry" | "continue";
   /** 题库提供者 */

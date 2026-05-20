@@ -257,6 +257,13 @@ export function SettingsPage() {
                     <Form.Item label="并发任务数" name="jobs">
                       <InputNumber min={1} max={16} style={{ width: "100%" }} />
                     </Form.Item>
+                    <Form.Item
+                      label="单课程章节内任务并发"
+                      name="tasksPerChapter"
+                      tooltip="同一章节里最多并行处理几个任务点（视频/作业等）。设为 1 即原有串行行为；增大可加速但 API 压力更大。"
+                    >
+                      <InputNumber min={1} max={8} style={{ width: "100%" }} />
+                    </Form.Item>
                     <Form.Item label="未开放章节处理" name="notopenAction">
                       <Select
                         options={[
