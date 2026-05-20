@@ -16,6 +16,7 @@ const defaultConfig: AppConfig = {
   speed: 1.0,
   jobs: 4,
   tasksPerChapter: 1,
+  chaptersPerCourse: 1,
   notopenAction: "retry",
   tikuProvider: "",
   tikuTokens: "",

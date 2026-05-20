@@ -6,6 +6,8 @@ export interface AppConfig {
   jobs: number;
   /** 单门课程内章节里同时并行的任务数 */
   tasksPerChapter: number;
+  /** 单门课程内同时并行的章节数（>1 时打破顺序解锁约束） */
+  chaptersPerCourse: number;
   /** 未开放操作: 重试或继续 */
   notopenAction: "retry" | "continue";
   /** 题库提供者 */

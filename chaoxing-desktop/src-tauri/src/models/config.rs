@@ -10,6 +10,9 @@ pub struct AppConfig {
     /// 单门课程内同时并行处理的任务点数（章节内并发度）
     #[serde(default = "default_tasks_per_chapter")]
     pub tasks_per_chapter: u32,
+    /// 单门课程内同时并行处理的章节数（章节级并发度，>1 时打破顺序解锁约束）
+    #[serde(default = "default_chapters_per_course")]
+    pub chapters_per_course: u32,
     #[serde(default = "default_notopen_action")]
     pub notopen_action: String,
     // 题库
@@ -81,6 +84,9 @@ fn default_jobs() -> u32 {
 fn default_tasks_per_chapter() -> u32 {
     1
 }
+fn default_chapters_per_course() -> u32 {
+    1
+}
 fn default_notopen_action() -> String {
     "retry".to_string()
 }
@@ -121,6 +127,7 @@ impl Default for AppConfig {
             speed: default_speed(),
             jobs: default_jobs(),
             tasks_per_chapter: default_tasks_per_chapter(),
+            chapters_per_course: default_chapters_per_course(),
             notopen_action: default_notopen_action(),
             tiku_provider: String::new(),
             tiku_tokens: String::new(),

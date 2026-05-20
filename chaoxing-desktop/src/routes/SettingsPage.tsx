@@ -264,6 +264,13 @@ export function SettingsPage() {
                     >
                       <InputNumber min={1} max={8} style={{ width: "100%" }} />
                     </Form.Item>
+                    <Form.Item
+                      label="单课程章节并发"
+                      name="chaptersPerCourse"
+                      tooltip="同一门课程里最多同时处理几个章节。设为 1 保持顺序解锁；增大可显著加速，但某些课程要求前章节完成才能解锁后章节，此时后章节会触发未开放重试/跳过。"
+                    >
+                      <InputNumber min={1} max={8} style={{ width: "100%" }} />
+                    </Form.Item>
                     <Form.Item label="未开放章节处理" name="notopenAction">
                       <Select
                         options={[
