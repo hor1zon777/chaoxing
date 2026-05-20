@@ -23,6 +23,11 @@ pub async fn get_job_list(
     let mut all_jobs = Vec::new();
     let mut merged_info = JobInfo::default();
 
+    // 用调用方传入的章节 ID 和课程 cpi 作为默认值
+    // （mArg defaults 中这两个字段未必有，Python 原版的 study_work 直接信任传入值）
+    merged_info.knowledgeid = knowledge_id.to_string();
+    merged_info.cpi = cpi.to_string();
+
     for num in 0..=6 {
         let num_str = num.to_string();
         let params = [

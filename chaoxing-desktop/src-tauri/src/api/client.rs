@@ -1,4 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::redirect::Policy;
 use reqwest::Client;
 use std::sync::Arc;
 
@@ -42,7 +43,7 @@ impl HttpClient {
         let client = Client::builder()
             .cookie_provider(cookie_store.clone())
             .default_headers(headers)
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("创建 HTTP 客户端失败");
 
@@ -52,6 +53,31 @@ impl HttpClient {
             rate_limiter: RateLimiter::new(0.5),
             video_rate_limiter: RateLimiter::new(2.0),
         }
+    }
+
+    /// 构建不自动跟随重定向的客户端（用于 work API 等需要手动处理重定向的场景）
+    pub fn client_builder_no_redirect(&self) -> Client {
+        let mut headers = HeaderMap::new();
+        headers.insert(USER_AGENT, HeaderValue::from_static(UA));
+        headers.insert(
+            "sec-ch-ua",
+            HeaderValue::from_static(
+                "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+            ),
+        );
+        headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+        headers.insert(
+            "sec-ch-ua-platform",
+            HeaderValue::from_static("\"Windows\""),
+        );
+
+        Client::builder()
+            .cookie_provider(self.cookie_store.clone())
+            .default_headers(headers)
+            .redirect(Policy::none())
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .expect("创建无重定向 HTTP 客户端失败")
     }
 
     /// 从 cookie store 获取指定 cookie 的值

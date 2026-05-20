@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Checkbox, Empty, Spin } from "antd";
+import { Alert, Checkbox, Empty, Progress } from "antd";
 import { useCourseStore } from "../stores/courseStore";
 import type { FlatCourseJob, JobType } from "../types/course";
 import { Card, Chip, Eyebrow, Headline, Metric, PillButton, Tag, UtilityButton } from "../components/ui/appleUI";
@@ -100,6 +100,7 @@ export function CourseTaskSelectPage() {
   const completedJobCount = useMemo(() => flatJobs.filter((job) => job.isCompleted).length, [flatJobs]);
   const pendingJobCount = flatJobs.length - completedJobCount;
   const chapterCount = useMemo(() => new Set(flatJobs.map((job) => job.pointId)).size, [flatJobs]);
+  const completionRate = flatJobs.length > 0 ? Math.round((completedJobCount / flatJobs.length) * 100) : 0;
 
   const isLoading = coursesLoading || (course ? treeLoadingIds.includes(course.id) : false);
   const batchActionDisabled = isLoading || filteredJobs.length === 0;
@@ -125,10 +126,56 @@ export function CourseTaskSelectPage() {
     );
   }
 
+  // 课程对象尚未加载完成：先用占位渲染 Hero + 进度条，避免整页只看到 Spin
   if (!course) {
     return (
-      <div style={{ padding: "120px 22px", background: "var(--apple-color-canvas)", textAlign: "center" }}>
-        <Spin size="large" tip="加载课程中..." />
+      <div style={{ background: "var(--apple-color-canvas)", minHeight: "100%" }}>
+        <section style={{ padding: "48px 22px 24px" }}>
+          <div style={{ maxWidth: 1024, margin: "0 auto" }}>
+            <div style={{ marginBottom: 20 }}>
+              <UtilityButton light onClick={() => navigate("/courses")}>
+                ← 返回课程列表
+              </UtilityButton>
+            </div>
+            <Eyebrow>任务配置</Eyebrow>
+            <Headline level="lg" style={{ marginTop: 8 }}>
+              正在加载课程
+            </Headline>
+            <div style={{ marginTop: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    letterSpacing: "-0.224px",
+                    color: "var(--apple-color-ink)",
+                  }}
+                >
+                  正在拉取课程信息
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 13,
+                    color: "var(--apple-color-ink-muted-48)",
+                    letterSpacing: "-0.12px",
+                  }}
+                >
+                  请稍候…
+                </span>
+              </div>
+              <Progress percent={100} status="active" showInfo={false} />
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -180,6 +227,88 @@ export function CourseTaskSelectPage() {
             <Metric label="未完成" value={pendingJobCount} hint="可继续学习" />
             <Metric label="已选任务" value={selectedJobCount} hint="将带入任务执行页" />
           </div>
+
+          {/* 课程完成进度（加载完成且有任务时显示） */}
+          {!isLoading && flatJobs.length > 0 ? (
+            <div style={{ marginTop: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    letterSpacing: "-0.224px",
+                    color: "var(--apple-color-ink)",
+                  }}
+                >
+                  完成进度
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 13,
+                    color: "var(--apple-color-ink-muted-48)",
+                    letterSpacing: "-0.12px",
+                  }}
+                >
+                  {completedJobCount}/{flatJobs.length} 任务 ({completionRate}%)
+                </span>
+              </div>
+              <Progress
+                percent={completionRate}
+                showInfo={false}
+                strokeColor={
+                  completionRate === 100
+                    ? "var(--apple-color-success, #34c759)"
+                    : "var(--apple-color-primary, #007aff)"
+                }
+              />
+            </div>
+          ) : null}
+
+          {/* 章节加载进度（仅在加载中显示） */}
+          {isLoading ? (
+            <div style={{ marginTop: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    letterSpacing: "-0.224px",
+                    color: "var(--apple-color-ink)",
+                  }}
+                >
+                  正在加载章节
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--apple-font-text)",
+                    fontSize: 13,
+                    color: "var(--apple-color-ink-muted-48)",
+                    letterSpacing: "-0.12px",
+                  }}
+                >
+                  {flatJobs.length > 0 ? `已加载 ${flatJobs.length} 个任务…` : "请稍候…"}
+                </span>
+              </div>
+              <Progress percent={100} status="active" showInfo={false} />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -341,9 +470,43 @@ export function CourseTaskSelectPage() {
       <section style={{ padding: "8px 22px 96px", background: "var(--apple-color-canvas)" }}>
         <div style={{ maxWidth: 1024, margin: "0 auto" }}>
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: 60 }}>
-              <Spin size="large" tip="加载任务中..." />
-            </div>
+            <Card>
+              <div style={{ padding: "20px 4px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    marginBottom: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--apple-font-text)",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      letterSpacing: "-0.224px",
+                      color: "var(--apple-color-ink)",
+                    }}
+                  >
+                    正在加载任务列表
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--apple-font-text)",
+                      fontSize: 13,
+                      color: "var(--apple-color-ink-muted-48)",
+                      letterSpacing: "-0.12px",
+                    }}
+                  >
+                    {flatJobs.length > 0
+                      ? `已加载 ${flatJobs.length} 个任务，${chapterCount} 个章节…`
+                      : "正在解析课程章节…"}
+                  </span>
+                </div>
+                <Progress percent={100} status="active" showInfo={false} />
+              </div>
+            </Card>
           ) : filteredJobs.length === 0 ? (
             <Card>
               <Empty

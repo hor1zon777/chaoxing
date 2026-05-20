@@ -20,6 +20,7 @@ use crate::models::course::CourseTaskSelection;
 use crate::state::AppState;
 use crate::task::scheduler::TaskScheduler;
 use crate::tiku::TikuManager;
+use crate::utils::log_bridge;
 
 /// RAII guard：确保 is_running 在任何退出路径（包括 panic）时都被重置
 struct RunningGuard {
@@ -52,6 +53,9 @@ pub async fn start_course_tasks(
     };
 
     let (tx, mut rx) = mpsc::unbounded_channel::<TaskEvent>();
+
+    // 激活日志桥接：所有 tracing 事件将转发到前端
+    log_bridge::set_log_channel(tx.clone());
 
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
@@ -260,6 +264,9 @@ pub async fn start_course_tasks(
     if !was_cancelled && task_error.is_none() {
         let _ = tx.send(TaskEvent::AllTasksCompleted);
     }
+
+    // 清除日志桥接，停止追踪事件转发
+    log_bridge::clear_log_channel();
 
     match task_error {
         Some(e) => Err(e),

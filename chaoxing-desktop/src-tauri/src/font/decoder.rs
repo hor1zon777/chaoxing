@@ -121,6 +121,14 @@ impl FontDecoder {
     }
 }
 
+/// 让 `font::decoder::FontDecoder` 实现 parser 层定义的同名 trait，
+/// 使其可以作为 `parse_questions_info` 的字体解码器注入。
+impl crate::parser::questions::FontDecoder for FontDecoder {
+    fn decode(&self, text: &str) -> String {
+        FontDecoder::decode(self, text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

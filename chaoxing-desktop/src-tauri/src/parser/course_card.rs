@@ -278,11 +278,18 @@ fn process_document_task(card: &Value, other_info: &str, is_completed: bool) -> 
 
 /// 处理作业类型任务
 fn process_work_task(card: &Value, other_info: &str, is_completed: bool) -> Job {
+    let property = card.get("property").cloned().unwrap_or(Value::Null);
+    let name = if !json_str(&property, "title").is_empty() {
+        json_str(&property, "title")
+    } else {
+        "章节检测".to_string()
+    };
+
     Job {
         job_type: JobType::Work,
         jobid: json_str(card, "jobid"),
         is_completed,
-        name: String::new(),
+        name,
         otherinfo: other_info.to_string(),
         mid: json_str(card, "mid"),
         objectid: String::new(),

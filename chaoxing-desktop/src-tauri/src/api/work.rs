@@ -11,6 +11,7 @@ use tracing;
 
 use crate::api::client::HttpClient;
 use crate::error::AppError;
+use crate::font::decoder::FontDecoder;
 use crate::models::events::TaskEvent;
 use crate::models::job::{Job, JobInfo};
 use crate::models::video::StudyResult;
@@ -41,7 +42,7 @@ pub async fn study_work(
     event_tx: Option<&tokio::sync::mpsc::UnboundedSender<TaskEvent>>,
 ) -> Result<StudyResult, AppError> {
     if tiku.disabled {
-        tracing::info!("题库未启用，跳过章节检测");
+        tracing::info!("题库未启用，跳过章节检测: {}", job.name);
         return Ok(StudyResult::Success);
     }
 
@@ -58,9 +59,14 @@ pub async fn study_work(
         return Ok(StudyResult::Success);
     }
 
-    tracing::info!("章节检测: 共 {} 道题目", total_questions);
+    tracing::info!(
+        "章节检测开始: {} (共 {} 道题目，题库: {})",
+        job.name,
+        total_questions,
+        tiku.provider.name()
+    );
 
-    // 搜题并匹配答案
+    // AI 搜题并匹配答案
     let mut found_answers = 0u32;
     let mut answer_map: HashMap<String, String> = HashMap::new();
     let mut answer_source_map: HashMap<String, String> = HashMap::new();
@@ -73,6 +79,7 @@ pub async fn study_work(
             tokio::time::sleep(std::time::Duration::from_secs_f64(tiku.delay)).await;
         }
 
+        tracing::info!("正在查询: {} [{}]", q.title, q_type_str);
         let query_result = tiku.query(&q.title, q_type_str, &q.options).await;
 
         let (answer, source) = if let Some(ref res) = query_result.answer {
@@ -81,34 +88,56 @@ pub async fn study_work(
                 "multiple" => match_multiple_answer(res, &q.options),
                 "single" => match_single_answer(res, &q.options),
                 "judgement" => {
-                    let is_true = tiku.judgement_select(res);
-                    if is_true {
+                    if res.trim().eq_ignore_ascii_case("true")
+                        || res.trim() == "正确"
+                        || res.trim() == "对"
+                    {
                         "true".to_string()
-                    } else {
+                    } else if res.trim().eq_ignore_ascii_case("false")
+                        || res.trim() == "错误"
+                        || res.trim() == "错"
+                    {
                         "false".to_string()
+                    } else {
+                        let is_true = tiku.judgement_select(res);
+                        if is_true { "true".to_string() } else { "false".to_string() }
                     }
                 }
-                "completion" => res.clone(),
-                // 简答题等其他类型直接使用答案
+                "completion" | "shortanswer" => res.trim().to_string(),
                 _ => res.clone(),
             };
 
             if matched.is_empty() {
-                tracing::warn!("找到答案但未能匹配选项 -> {} ，随机选择答案", res);
-                (random_answer(q_type_str, &q.options), "random")
+                if q_type_str == "completion" || q_type_str == "shortanswer" {
+                    tracing::warn!(
+                        "AI 返回填空/简答答案 '{}' 但内容为空，跳过该题（不保存不提交）: {}",
+                        res,
+                        q.title
+                    );
+                    (String::new(), "skip")
+                } else {
+                    tracing::warn!("AI 答案 '{}' 未能匹配选项，使用随机答案", res);
+                    (random_answer(q_type_str, &q.options), "random")
+                }
             } else {
-                tracing::info!("成功获取到答案: {}", matched);
+                tracing::info!("AI 匹配成功: {} -> {}", q.title, matched);
                 found_answers += 1;
                 (matched, "cover")
             }
+        } else if q_type_str == "completion" || q_type_str == "shortanswer" {
+            // 填空/简答题 AI 失败：跳过该题，不写入提交表单
+            tracing::warn!(
+                "AI 未返回填空/简答答案: {}，跳过该题（不保存不提交）",
+                q.title
+            );
+            (String::new(), "skip")
         } else {
-            // 随机答题
+            tracing::warn!("AI 未返回答案: {}，使用随机答案", q.title);
             (random_answer(q_type_str, &q.options), "random")
         };
 
         answer_source_map.insert(q.id.clone(), source.to_string());
         answer_map.insert(q.id.clone(), answer.clone());
-        tracing::info!("{} 填写答案为 {}", q.title, answer);
 
         // 发送答题事件
         if let Some(tx) = event_tx {
@@ -121,8 +150,17 @@ pub async fn study_work(
         }
     }
 
-    let cover_rate = (found_answers as f64 / total_questions as f64) * 100.0;
-    tracing::info!("章节检测题库覆盖率: {:.0}%", cover_rate);
+    let cover_rate = if total_questions > 0 {
+        (found_answers as f64 / total_questions as f64) * 100.0
+    } else {
+        100.0
+    };
+    tracing::info!(
+        "章节检测完成: AI 命中率 {:.0}% ({}/{})",
+        cover_rate,
+        found_answers,
+        total_questions
+    );
 
     // 决定提交模式
     let py_flag = determine_py_flag(tiku, cover_rate);
@@ -154,6 +192,7 @@ pub async fn study_work(
 /// 获取题目页面并解析
 ///
 /// 对应 Python fetch_response()（带重试）
+/// 与 Python 原版保持一致：使用主 client，让 reqwest 自动跟随重定向
 async fn fetch_questions(
     client: &HttpClient,
     course_id: &str,
@@ -163,9 +202,9 @@ async fn fetch_questions(
     job_info: &JobInfo,
     enc: &str,
 ) -> Result<QuestionsFormData, AppError> {
-    let url = "https://mooc1.chaoxing.com/mooc-ans/api/work";
+    let api_url = "https://mooc1.chaoxing.com/mooc-ans/api/work";
 
-    let params = [
+    let params: Vec<(&str, &str)> = vec![
         ("api", "1"),
         ("workId", work_id),
         ("jobid", jobid),
@@ -188,12 +227,7 @@ async fn fetch_questions(
     for attempt in 0..3u32 {
         client.rate_limiter.limit_rate().await;
 
-        let resp = client
-            .client
-            .get(url)
-            .query(&params)
-            .send()
-            .await;
+        let resp = client.client.get(api_url).query(&params).send().await;
 
         let resp = match resp {
             Ok(r) => r,
@@ -206,31 +240,77 @@ async fn fetch_questions(
             }
         };
 
-        if resp.status().as_u16() != 200 {
+        let status = resp.status().as_u16();
+
+        let html = if status == 200 {
+            match resp.text().await {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::warn!("响应解码失败: {}，重试中... ({}/3)", e, attempt + 1);
+                    last_err = Some(AppError::Parse(e.to_string()));
+                    let delay = std::time::Duration::from_secs(2u64.pow(attempt + 1));
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+            }
+        } else {
+            let body_preview = resp.text().await.unwrap_or_default();
+            let preview: String = body_preview.chars().take(500).collect();
             tracing::warn!(
-                "无效响应 (Code: {})，重试中... ({}/3)",
-                resp.status(),
+                "服务器返回错误状态码: {}，响应预览: {}，重试中... ({}/3)",
+                status,
+                preview.replace('\n', " "),
                 attempt + 1
             );
+            last_err = Some(AppError::Other(format!(
+                "服务器返回错误状态码: {}",
+                status
+            )));
             let delay = std::time::Duration::from_secs(2u64.pow(attempt + 1));
             tokio::time::sleep(delay).await;
             continue;
-        }
-
-        let html = resp.text().await.map_err(|e| AppError::Parse(e.to_string()))?;
+        };
 
         // 检查是否教师未创建完成
         if html.contains("教师未创建完成该测验") {
             return Err(AppError::Other("教师未创建完成该测验".to_string()));
         }
 
-        let questions = parse_questions_info(&html, None)?;
+        // 尝试构造字体解码器：当题目页含有 <style id="cxSecretStyle"> 时使用
+        let font_decoder = FontDecoder::from_html(&html);
+        if font_decoder.is_some() {
+            tracing::info!("检测到加密字体，启用字体解密");
+        }
+
+        // 解析题目（解析失败也重试，与 Python 行为一致）
+        let questions = match parse_questions_info(
+            &html,
+            font_decoder.as_ref().map(|d| d as &dyn crate::parser::questions::FontDecoder),
+        ) {
+            Ok(q) => q,
+            Err(e) => {
+                tracing::warn!("题目解析失败: {}，重试中... ({}/3)", e, attempt + 1);
+                last_err = Some(e);
+                let delay = std::time::Duration::from_secs(2u64.pow(attempt + 1));
+                tokio::time::sleep(delay).await;
+                continue;
+            }
+        };
 
         if !questions.questions.is_empty() {
             return Ok(questions);
         }
 
-        tracing::warn!("未解析到题目，重试中... ({}/3)", attempt + 1);
+        let preview: String = html.chars().take(200).collect();
+        tracing::warn!(
+            "未解析到题目 (HTML 预览: {})，重试中... ({}/3)",
+            preview.replace('\n', " "),
+            attempt + 1
+        );
+        last_err = Some(AppError::Other(format!(
+            "响应中未能解析到题目 (body 前200字: {})",
+            preview.replace('\n', " ")
+        )));
         let delay = std::time::Duration::from_secs(2u64.pow(attempt + 1));
         tokio::time::sleep(delay).await;
     }
@@ -238,42 +318,26 @@ async fn fetch_questions(
     Err(last_err.unwrap_or_else(|| AppError::Other("获取题目超过最大重试次数".to_string())))
 }
 
-/// 匹配多选题答案到选项
-///
-/// 对应 Python study_work() 中的多选匹配逻辑
-fn match_multiple_answer(answer: &str, options: &str) -> String {
-    let options_list = match cut(options) {
-        Some(list) => list,
-        None => return String::new(),
-    };
-    let answer_parts = match cut(answer) {
-        Some(list) => list,
-        None => return String::new(),
-    };
+/// 匹配单选题答案到选项
+fn match_single_answer(answer: &str, options: &str) -> String {
+    let trimmed = answer.trim();
 
-    let cleaned_answers = clean_res(&answer_parts);
-    let mut result = String::new();
-
-    for a in &cleaned_answers {
-        for o in &options_list {
-            if is_subsequence(a, o) {
-                // 取首字为答案（例如 A 或 B）
-                if let Some(first_char) = o.chars().next() {
-                    result.push(first_char);
-                }
-                break;
+    // 如果答案本身就是一个选项字母 (A-Z)，直接返回
+    if trimmed.len() == 1 {
+        let c = trimmed.chars().next().unwrap();
+        if c.is_ascii_uppercase() {
+            // 验证该字母是否在选项中存在
+            let first_chars: Vec<char> = options
+                .split('\n')
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| s.chars().next())
+                .collect();
+            if first_chars.contains(&c) {
+                return c.to_string();
             }
         }
     }
 
-    // 排序，否则提交失败
-    let mut chars: Vec<char> = result.chars().collect();
-    chars.sort();
-    chars.into_iter().collect()
-}
-
-/// 匹配单选题答案到选项
-fn match_single_answer(answer: &str, options: &str) -> String {
     let options_list = match cut(options) {
         Some(list) => list,
         None => return String::new(),
@@ -290,6 +354,63 @@ fn match_single_answer(answer: &str, options: &str) -> String {
     }
 
     String::new()
+}
+
+/// 匹配多选题答案到选项
+fn match_multiple_answer(answer: &str, options: &str) -> String {
+    let options_list = match cut(options) {
+        Some(list) => list,
+        None => return String::new(),
+    };
+
+    let answer_parts = match cut(answer) {
+        Some(list) => list,
+        None => return String::new(),
+    };
+
+    let cleaned_answers = clean_res(&answer_parts);
+
+    // 检查是否所有清理后的答案都是单个字母（AI 直接返回了 ABCD）
+    let all_single_letters = cleaned_answers
+        .iter()
+        .all(|a| a.len() == 1 && a.chars().next().map_or(false, |c| c.is_ascii_uppercase()));
+
+    if all_single_letters {
+        let first_chars: Vec<char> = options_list
+            .iter()
+            .filter_map(|o| o.chars().next())
+            .collect();
+        let mut result = String::new();
+        for a in &cleaned_answers {
+            let c = a.chars().next().unwrap();
+            if first_chars.contains(&c) {
+                result.push(c);
+            }
+        }
+        if !result.is_empty() {
+            let mut chars: Vec<char> = result.chars().collect();
+            chars.sort();
+            return chars.into_iter().collect();
+        }
+    }
+
+    // 子序列匹配
+    let mut result = String::new();
+    for a in &cleaned_answers {
+        for o in &options_list {
+            if is_subsequence(a, o) {
+                if let Some(first_char) = o.chars().next() {
+                    result.push(first_char);
+                }
+                break;
+            }
+        }
+    }
+
+    // 排序，否则提交失败
+    let mut chars: Vec<char> = result.chars().collect();
+    chars.sort();
+    chars.into_iter().collect()
 }
 
 /// 清理答案中的字母编号和标点符号
@@ -391,16 +512,12 @@ fn random_answer(q_type: &str, options: &str) -> String {
 fn determine_py_flag(tiku: &TikuManager, cover_rate: f64) -> String {
     if tiku.get_submit_flag() == "1" {
         // 配置为仅保存不提交
+        tracing::info!("题库配置为仅保存，不提交");
         "1".to_string()
-    } else if cover_rate >= tiku.cover_rate * 100.0 {
-        // 覆盖率达标，直接提交
-        String::new()
     } else {
-        tracing::info!(
-            "章节检测题库覆盖率低于 {:.0}%，不予提交",
-            tiku.cover_rate * 100.0
-        );
-        "1".to_string()
+        // 提交模式：总是提交（AI 大模型已启用，信任其答案质量）
+        tracing::info!("章节检测题库覆盖率: {:.0}%，将直接提交", cover_rate);
+        String::new()
     }
 }
 
@@ -415,11 +532,24 @@ fn build_submit_form(
 ) -> HashMap<String, String> {
     let mut form = questions_data.form_fields.clone();
 
-    // 添加 answerwqbid
-    form.insert("answerwqbid".to_string(), questions_data.answerwqbid.clone());
-
     // 添加 pyFlag
     form.insert("pyFlag".to_string(), py_flag.to_string());
+
+    // 重新生成 answerwqbid（排除被跳过的题目）
+    let active_ids: Vec<&str> = questions_data
+        .questions
+        .iter()
+        .filter(|q| {
+            answer_source_map.get(&q.id).map(|s| s.as_str()) != Some("skip")
+        })
+        .map(|q| q.id.as_str())
+        .collect();
+    let answerwqbid = if active_ids.is_empty() {
+        String::new()
+    } else {
+        format!("{},", active_ids.join(","))
+    };
+    form.insert("answerwqbid".to_string(), answerwqbid);
 
     // 添加每题的答案
     for q in &questions_data.questions {
@@ -427,6 +557,12 @@ fn build_submit_form(
             .get(&q.id)
             .map(|s| s.as_str())
             .unwrap_or("random");
+
+        // 跳过被标记为 skip 的题目（填空/简答 AI 失败）
+        if source == "skip" {
+            tracing::info!("跳过题目（未写入提交表单）: {}", q.title);
+            continue;
+        }
 
         let answer = answer_map.get(&q.id).cloned().unwrap_or_default();
 
@@ -437,23 +573,52 @@ fn build_submit_form(
             .cloned()
             .unwrap_or_default();
 
+        // 填空 / 简答：用 <p>...</p> 包裹答案以匹配 UEditor 富文本格式
+        // 否则超星后台解析后会显示为空（参考 cxmooc-tools 修复 commit afe12b0）
+        let needs_html_wrap = matches!(
+            q.question_type,
+            QuestionType::Completion | QuestionType::ShortAnswer
+        );
+        let format_answer = |raw: String| -> String {
+            if !needs_html_wrap || raw.is_empty() {
+                return raw;
+            }
+            // 多空答案以 \n 分隔，每空独立 <p>
+            raw.split('\n')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(html_escape)
+                .map(|s| format!("<p>{}</p>", s))
+                .collect::<Vec<_>>()
+                .join("")
+        };
+
         if py_flag == "1" {
             // 保存模式：仅保存题库查到的答案，随机答案留空
             let final_answer = if source == "cover" {
-                answer
+                format_answer(answer)
             } else {
                 String::new()
             };
             form.insert(format!("answer{}", q.id), final_answer);
         } else {
             // 提交模式：所有答案都填入
-            form.insert(format!("answer{}", q.id), answer);
+            form.insert(format!("answer{}", q.id), format_answer(answer));
         }
 
         form.insert(format!("answertype{}", q.id), answer_type);
     }
 
     form
+}
+
+/// 转义 HTML 特殊字符，避免破坏 UEditor 富文本结构
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 /// 提交答案
@@ -476,6 +641,13 @@ async fn submit_work(
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
         .header("Origin", "https://mooc1.chaoxing.com")
+        .header(
+            "Accept",
+            "application/json, text/javascript, */*; q=0.01",
+        )
+        .header("Sec-Fetch-Site", "same-origin")
+        .header("Sec-Fetch-Mode", "cors")
+        .header("Sec-Fetch-Dest", "empty")
         .form(form_data)
         .send()
         .await?;
@@ -588,5 +760,13 @@ mod tests {
         let manager = TikuManager::from_config(&config);
         // submit=false 意味着仅保存（flag="1"）
         assert_eq!(determine_py_flag(&manager, 90.0), "1");
+    }
+
+    #[test]
+    fn test_html_escape() {
+        assert_eq!(html_escape("a & b"), "a &amp; b");
+        assert_eq!(html_escape("<p>x</p>"), "&lt;p&gt;x&lt;/p&gt;");
+        assert_eq!(html_escape("纯文本"), "纯文本");
+        assert_eq!(html_escape("a\"b'c"), "a&quot;b&#39;c");
     }
 }

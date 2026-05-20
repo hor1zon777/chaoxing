@@ -158,12 +158,20 @@ impl TikuAi {
             }
         };
 
-        // 提取回复内容
-        let content = json["choices"][0]["message"]["content"]
+        // 提取回复内容（优先 content，推理模型回退到 reasoning_content）
+        let mut content = json["choices"][0]["message"]["content"]
             .as_str()
-            .unwrap_or("");
+            .unwrap_or("")
+            .to_string();
 
-        self.parse_ai_response(content)
+        if content.is_empty() {
+            content = json["choices"][0]["message"]["reasoning_content"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+        }
+
+        self.parse_ai_response(&content)
     }
 
     /// 解析 AI 响应，提取 Answer 数组
@@ -238,7 +246,7 @@ impl TikuAi {
             "messages": [
                 { "role": "user", "content": "你好，请回答：1+1 等于几？只回答数字。" }
             ],
-            "max_tokens": 10,
+            "max_tokens": 2000,
         });
 
         let resp = match self
@@ -270,15 +278,23 @@ impl TikuAi {
             }
         };
 
-        let has_content = json["choices"][0]["message"]["content"]
-            .as_str()
-            .map(|s| !s.is_empty())
-            .unwrap_or(false);
+        let has_content = {
+            let content = json["choices"][0]["message"]["content"]
+                .as_str()
+                .unwrap_or("");
+            let reasoning = json["choices"][0]["message"]["reasoning_content"]
+                .as_str()
+                .unwrap_or("");
+            !content.is_empty() || !reasoning.is_empty()
+        };
 
         if has_content {
             tracing::info!("AI 大模型连接检查成功");
         } else {
-            tracing::error!("AI 大模型连接检查失败: 未收到响应");
+            tracing::error!(
+                "AI 大模型连接检查失败: 未收到响应，原始返回: {}",
+                serde_json::to_string(&json).unwrap_or_default()
+            );
         }
         has_content
     }

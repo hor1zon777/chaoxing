@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Input, Pagination, Spin, Empty, Alert, message } from "antd";
+import { Input, Pagination, Spin, Empty, Alert, Progress, message } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useCourseStore } from "../stores/courseStore";
@@ -35,6 +35,7 @@ export function CoursesPage() {
     courses,
     selectedCourseIds,
     courseTypeFilter,
+    courseTrees,
     isLoading,
     error,
     fetchCourses,
@@ -250,6 +251,12 @@ export function CoursesPage() {
                 {paginatedCourses.map((course) => {
                   const isSelected = selectedCourseIds.includes(course.id);
                   const isActivating = activatingId === course.id;
+                  const tree = courseTrees[course.id];
+                  const jobs = tree ? tree.points.flatMap((p) => p.jobs) : [];
+                  const totalJobs = jobs.length;
+                  const completedJobs = jobs.filter((j) => j.isCompleted).length;
+                  const completionRate = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
+                  const hasProgressData = tree !== undefined && totalJobs > 0;
                   return (
                     <Card
                       key={course.id}
@@ -297,6 +304,37 @@ export function CoursesPage() {
                           {isSelected ? <Tag tone="success">已配置</Tag> : null}
                           <Tag tone="neutral">{course.teacher || "未知教师"}</Tag>
                         </div>
+
+                        {hasProgressData ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "baseline",
+                                fontFamily: "var(--apple-font-text)",
+                                fontSize: 12,
+                                color: "var(--apple-color-ink-muted-48)",
+                                letterSpacing: "-0.12px",
+                              }}
+                            >
+                              <span>完成进度</span>
+                              <span style={{ fontWeight: 600, color: "var(--apple-color-ink)" }}>
+                                {completedJobs}/{totalJobs} ({completionRate}%)
+                              </span>
+                            </div>
+                            <Progress
+                              percent={completionRate}
+                              size="small"
+                              showInfo={false}
+                              strokeColor={
+                                completionRate === 100
+                                  ? "var(--apple-color-success, #34c759)"
+                                  : "var(--apple-color-primary, #007aff)"
+                              }
+                            />
+                          </div>
+                        ) : null}
 
                         <div
                           style={{

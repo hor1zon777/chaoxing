@@ -113,9 +113,9 @@ impl TikuManager {
         let provider = if disabled {
             TikuProvider::Disabled
         } else {
-            match provider_name {
-                "TikuYanxi" => TikuProvider::Yanxi(yanxi::TikuYanxi::new(&config.tiku_tokens)),
-                "TikuLike" => TikuProvider::Like(like::TikuLike::new(
+            match provider_name.to_lowercase().as_str() {
+                "yanxi" | "tikuyanxi" => TikuProvider::Yanxi(yanxi::TikuYanxi::new(&config.tiku_tokens)),
+                "like" | "tikulike" => TikuProvider::Like(like::TikuLike::new(
                     &config.tiku_tokens,
                     config.like_search,
                     config.like_vision,
@@ -123,22 +123,46 @@ impl TikuManager {
                     config.like_retry,
                     config.like_retry_times,
                 )),
-                "TikuAdapter" => {
+                "adapter" | "tikuadapter" => {
                     TikuProvider::Adapter(adapter::TikuAdapter::new(&config.tiku_adapter_url))
                 }
-                "AI" => TikuProvider::Ai(ai::TikuAi::new(
-                    &config.ai_endpoint,
-                    &config.ai_key,
-                    &config.ai_model,
-                    &config.ai_proxy,
-                    config.ai_min_interval,
-                )),
-                "SiliconFlow" => TikuProvider::SiliconFlow(siliconflow::TikuSiliconFlow::new(
-                    &config.siliconflow_endpoint,
-                    &config.siliconflow_key,
-                    &config.siliconflow_model,
-                    config.ai_min_interval,
-                )),
+                "ai" => {
+                    // 验证 AI 配置完整
+                    if config.ai_endpoint.trim().is_empty() || config.ai_key.trim().is_empty() {
+                        tracing::error!(
+                            "AI 题库配置不完整 (endpoint={}, key已设置={})，请填写 API 端点和 Key",
+                            config.ai_endpoint.trim(),
+                            !config.ai_key.trim().is_empty()
+                        );
+                        TikuProvider::Disabled
+                    } else {
+                        tracing::info!(
+                            "启用 AI 大模型题库: endpoint={}, model={}",
+                            config.ai_endpoint.trim(),
+                            config.ai_model.trim()
+                        );
+                        TikuProvider::Ai(ai::TikuAi::new(
+                            &config.ai_endpoint,
+                            &config.ai_key,
+                            &config.ai_model,
+                            &config.ai_proxy,
+                            config.ai_min_interval,
+                        ))
+                    }
+                }
+                "siliconflow" => {
+                    if config.siliconflow_key.trim().is_empty() {
+                        tracing::error!("SiliconFlow 题库配置不完整，请填写 Key");
+                        TikuProvider::Disabled
+                    } else {
+                        TikuProvider::SiliconFlow(siliconflow::TikuSiliconFlow::new(
+                            &config.siliconflow_endpoint,
+                            &config.siliconflow_key,
+                            &config.siliconflow_model,
+                            config.ai_min_interval,
+                        ))
+                    }
+                }
                 other => {
                     tracing::error!("未知题库提供者: {}，题库功能已禁用", other);
                     TikuProvider::Disabled
@@ -169,9 +193,9 @@ impl TikuManager {
             .join("cache.json");
 
         Self {
+            disabled: disabled || matches!(provider, TikuProvider::Disabled),
             provider,
             cache: cache::CacheDAO::new(cache_path),
-            disabled: disabled || matches!(&provider_name, &""),
             submit: config.tiku_submit,
             cover_rate: config.tiku_cover_rate,
             true_list,
