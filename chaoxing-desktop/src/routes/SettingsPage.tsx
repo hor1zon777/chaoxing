@@ -19,6 +19,15 @@ export function SettingsPage() {
 
   const summaryConfig = { ...config, ...formValues } as AppConfig;
 
+  // 仅对比已注册（已渲染）的字段：若任意字段与 store 中 config 不同则视为 dirty
+  const isDirty = useMemo(() => {
+    if (!formValues) return false;
+    return Object.entries(formValues).some(([key, value]) => {
+      const original = (config as unknown as Record<string, unknown>)[key];
+      return JSON.stringify(value) !== JSON.stringify(original);
+    });
+  }, [formValues, config]);
+
   useEffect(() => {
     void loadConfig();
   }, [loadConfig]);
@@ -505,10 +514,12 @@ export function SettingsPage() {
                 fontSize: 17,
                 fontWeight: 600,
                 letterSpacing: "-0.374px",
-                color: "var(--apple-color-ink)",
+                color: isDirty
+                  ? "var(--apple-color-ink)"
+                  : "var(--apple-color-ink-muted-48)",
               }}
             >
-              配置变更未保存
+              {isDirty ? "配置变更未保存" : "配置已是最新"}
             </div>
             <div
               style={{
@@ -519,7 +530,7 @@ export function SettingsPage() {
                 marginTop: 2,
               }}
             >
-              点击保存以持久化到 config.json
+              {isDirty ? "点击保存以持久化到 config.json" : "全部更改已写入 config.json"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
