@@ -95,7 +95,10 @@ export function SettingsPage() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      await saveConfig(values);
+      // 合并：以现有 config 为基底，仅覆盖表单当前注册的字段
+      // 避免因 Tab 条件渲染导致未注册字段被 serde 默认值覆盖
+      const merged: AppConfig = { ...config, ...values };
+      await saveConfig(merged);
       msgApi.success("配置已保存");
     } catch {
       msgApi.error("保存失败");
@@ -138,7 +141,8 @@ export function SettingsPage() {
     setTestingTiku(true);
     try {
       const values = form.getFieldsValue();
-      await saveConfig(values);
+      const merged: AppConfig = { ...config, ...values };
+      await saveConfig(merged);
       const ok = await invoke<boolean>("test_tiku_connection");
       if (ok) msgApi.success("题库连接正常");
       else msgApi.error("题库连接失败");
@@ -241,7 +245,7 @@ export function SettingsPage() {
 
       <section style={{ padding: "0 22px 80px" }}>
         <div style={{ maxWidth: 1024, margin: "0 auto" }}>
-          <Form form={form} layout="vertical" initialValues={config}>
+          <Form form={form} layout="vertical" initialValues={config} preserve>
             {activeTab === "general" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <Card title="任务执行默认参数" subtitle="影响所有课程任务的默认行为">
