@@ -21,16 +21,21 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: "--target aarch64-apple-darwin"
+            # macOS Apple Silicon：只构建 dmg
+            args: "--target aarch64-apple-darwin --bundles dmg"
             rust_target: aarch64-apple-darwin
           - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
+            # macOS Intel：只构建 dmg
+            args: "--target x86_64-apple-darwin --bundles dmg"
             rust_target: x86_64-apple-darwin
           - platform: ubuntu-22.04
-            args: ""
+            # Linux：构建 deb + appimage（不打 rpm，避免依赖 rpmbuild）
+            args: "--bundles deb,appimage"
             rust_target: x86_64-unknown-linux-gnu
           - platform: windows-latest
-            args: ""
+            # Windows：只构建 NSIS。
+            # 不构建 MSI 是因为 WiX light.exe 无法处理中文 productName 导致打包失败
+            args: "--bundles nsis"
             rust_target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
@@ -105,7 +110,7 @@ jobs:
             自动构建的桌面版发布。
 
             ### 安装包说明
-            - **Windows**: `*.exe` (NSIS 安装包)
+            - **Windows**: `*-setup.exe` (NSIS 安装包)
             - **macOS (Apple Silicon)**: `*_aarch64.dmg`
             - **macOS (Intel)**: `*_x64.dmg`
             - **Linux**: `*.AppImage` / `*.deb`
