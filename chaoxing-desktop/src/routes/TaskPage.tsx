@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import { useTaskStore } from "../stores/taskStore";
 import { useCourseStore } from "../stores/courseStore";
+import { useConfigStore } from "../stores/configStore";
 import type { TaskEvent, LogEntry } from "../types/task";
 import { Card, Chip, Eyebrow, Headline, Metric, PillButton, Tag, UtilityButton } from "../components/ui/appleUI";
 
@@ -64,10 +65,47 @@ const notopenOptions = [
 type LogFilterValue = "all" | "info" | "warn" | "error";
 
 export function TaskPage() {
-  const [speed, setSpeed] = useState(1.0);
-  const [jobCount, setJobCount] = useState(4);
-  const [notopenAction, setNotopenAction] = useState<"retry" | "continue">("retry");
+  // 执行参数默认与设置页对齐：未手动修改前跟随 configStore，
+  // 一旦本地修改则保持本次值（仅作用于本次执行，不写回设置）
+  const config = useConfigStore((state) => state.config);
+  const loadConfig = useConfigStore((state) => state.loadConfig);
+
+  const [speed, setSpeedState] = useState<number>(config.speed);
+  const [jobCount, setJobCountState] = useState<number>(config.jobs);
+  const [notopenAction, setNotopenActionState] = useState<"retry" | "continue">(
+    config.notopenAction,
+  );
+  // 标记用户是否已在任务页手动修改过对应字段，未改过时跟随设置
+  const speedDirtyRef = useRef(false);
+  const jobsDirtyRef = useRef(false);
+  const notopenDirtyRef = useRef(false);
+
+  const setSpeed = useCallback((value: number) => {
+    speedDirtyRef.current = true;
+    setSpeedState(value);
+  }, []);
+  const setJobCount = useCallback((value: number) => {
+    jobsDirtyRef.current = true;
+    setJobCountState(value);
+  }, []);
+  const setNotopenAction = useCallback((value: "retry" | "continue") => {
+    notopenDirtyRef.current = true;
+    setNotopenActionState(value);
+  }, []);
+
   const [isActionPending, setIsActionPending] = useState(false);
+
+  // 进入页面时刷新一次配置，保证默认值是最新的
+  useEffect(() => {
+    void loadConfig();
+  }, [loadConfig]);
+
+  // 设置变化时，仅同步用户尚未手动改过的字段
+  useEffect(() => {
+    if (!speedDirtyRef.current) setSpeedState(config.speed);
+    if (!jobsDirtyRef.current) setJobCountState(config.jobs);
+    if (!notopenDirtyRef.current) setNotopenActionState(config.notopenAction);
+  }, [config.speed, config.jobs, config.notopenAction]);
 
   const {
     isRunning,
@@ -89,8 +127,21 @@ export function TaskPage() {
     useCourseStore();
   const logContainerRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<Channel<TaskEvent> | null>(null);
+  // 每次 start 递增，用来在组件卸载/重启任务时让旧 channel 的事件失效，
+  // 避免重新进页 + 启动新任务时旧事件错位归入新 session
+  const sessionIdRef = useRef(0);
   const hasInitializedLogScrollRef = useRef(false);
   const previousLastLogRef = useRef<string | null>(null);
+
+  // 组件卸载时清理 channel 回调，防止页面切换后旧 channel 仍在投递事件
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.onmessage = () => {};
+        channelRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const container = logContainerRef.current;
@@ -114,6 +165,20 @@ export function TaskPage() {
     }
     previousLastLogRef.current = lastLogKey;
   }, [logs]);
+
+  // 选项列表：若当前值（来自设置）不在默认选项里，临时合并显示，避免显示空白
+  const speedSelectOptions = useMemo(() => {
+    if (speedOptions.some((opt) => opt.value === speed)) return speedOptions;
+    return [...speedOptions, { value: speed, label: `${speed}x` }].sort(
+      (a, b) => a.value - b.value,
+    );
+  }, [speed]);
+  const jobCountSelectOptions = useMemo(() => {
+    if (jobCountOptions.some((opt) => opt.value === jobCount)) return jobCountOptions;
+    return [...jobCountOptions, { value: jobCount, label: `${jobCount} 线程` }].sort(
+      (a, b) => a.value - b.value,
+    );
+  }, [jobCount]);
 
   const selectedCourses = useMemo(
     () => courses.filter((c) => selectedCourseIds.includes(c.id)),
@@ -157,8 +222,20 @@ export function TaskPage() {
     reset();
     setRunning(true);
 
+    // 失效上一个 channel：先清空回调，再让 sessionId 自增，旧 channel 之后到达的消息会被丢弃
+    if (channelRef.current) {
+      channelRef.current.onmessage = () => {};
+      channelRef.current = null;
+    }
+    sessionIdRef.current += 1;
+    const currentSession = sessionIdRef.current;
+
     const channel = new Channel<TaskEvent>();
-    channel.onmessage = (event: TaskEvent) => handleTaskEvent(event);
+    channel.onmessage = (event: TaskEvent) => {
+      // 旧 session 的事件直接丢弃，避免重启任务时事件错位
+      if (currentSession !== sessionIdRef.current) return;
+      handleTaskEvent(event);
+    };
     channelRef.current = channel;
 
     try {
@@ -247,8 +324,14 @@ export function TaskPage() {
   const progressEntries = useMemo(() => Object.values(courseProgress), [courseProgress]);
   const totalChapters = progressEntries.reduce((sum, p) => sum + p.totalChapters, 0);
   const completedChapters = progressEntries.reduce((sum, p) => sum + p.completedChapters, 0);
-  const overallPercent =
-    totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
+  const totalJobs = progressEntries.reduce((sum, p) => sum + p.totalJobs, 0);
+  const completedJobs = progressEntries.reduce((sum, p) => sum + p.completedJobs, 0);
+  // 主进度按章节计算；当章节进度卡住（如后端漏 chapterCompleted），
+  // 用 job 维度做兜底，避免永久停留在 99%
+  const chapterPercent =
+    totalChapters > 0 ? (completedChapters / totalChapters) * 100 : 0;
+  const jobPercent = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
+  const overallPercent = Math.round(Math.max(chapterPercent, jobPercent));
 
   const videoEntries = useMemo(() => Object.values(videoProgress), [videoProgress]);
 
@@ -473,7 +556,7 @@ export function TaskPage() {
                 <Select
                   value={speed}
                   onChange={setSpeed}
-                  options={speedOptions}
+                  options={speedSelectOptions}
                   disabled={isRunning}
                   style={{ minWidth: 140 }}
                 />
@@ -482,7 +565,7 @@ export function TaskPage() {
                 <Select
                   value={jobCount}
                   onChange={setJobCount}
-                  options={jobCountOptions}
+                  options={jobCountSelectOptions}
                   disabled={isRunning}
                   style={{ minWidth: 140 }}
                 />
