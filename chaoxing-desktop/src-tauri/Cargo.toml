@@ -2,6 +2,9 @@
 name = "chaoxing-desktop"
 version = "0.1.0"
 edition = "2021"
+description = "超星学习通桌面助手"
+license = "GPL-3.0"
+repository = "https://github.com/hor1zon777/chaoxing"
 
 [lib]
 name = "chaoxing_desktop_lib"
@@ -35,4 +38,6 @@ ttf-parser = "0.25"
 configparser = "3"
 url = "2"
 cookie_store = "0.21"
+
+[target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_Storage_FileSystem"] }

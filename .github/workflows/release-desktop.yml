@@ -76,6 +76,7 @@ jobs:
             curl \
             wget \
             file \
+            libfuse2 \
             libxdo-dev
 
       - name: Install frontend dependencies
