@@ -13,30 +13,29 @@ on:
 
 jobs:
   build-tauri:
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.platform }} / ${{ matrix.rust_target }})
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: macos-latest
-            # macOS Apple Silicon：只构建 dmg
             args: "--target aarch64-apple-darwin --bundles dmg"
             rust_target: aarch64-apple-darwin
+            artifact_name: macos-aarch64
           - platform: macos-latest
-            # macOS Intel：只构建 dmg
             args: "--target x86_64-apple-darwin --bundles dmg"
             rust_target: x86_64-apple-darwin
+            artifact_name: macos-x86_64
           - platform: ubuntu-22.04
-            # Linux：构建 deb + appimage（不打 rpm，避免依赖 rpmbuild）
             args: "--bundles deb,appimage"
             rust_target: x86_64-unknown-linux-gnu
+            artifact_name: linux-x86_64
           - platform: windows-latest
-            # Windows：只构建 NSIS。
-            # 不构建 MSI 是因为 WiX light.exe 无法处理中文 productName 导致打包失败
             args: "--bundles nsis"
             rust_target: x86_64-pc-windows-msvc
+            artifact_name: windows-x86_64
 
     runs-on: ${{ matrix.platform }}
 
@@ -88,6 +87,59 @@ jobs:
         working-directory: chaoxing-desktop
         run: pnpm install --frozen-lockfile
 
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: chaoxing-desktop
+          args: ${{ matrix.args }}
+
+      - name: Collect bundle artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          # 用 find 兼容跨平台地收集所有可能的产物
+          BUNDLE_DIR="chaoxing-desktop/src-tauri/target"
+          # 子目录可能是 release（无 --target）或 <triple>/release（有 --target）
+          find "$BUNDLE_DIR" -type d -name bundle | while read -r dir; do
+            echo "Searching: $dir"
+            find "$dir" \
+              \( -name "*.dmg" \
+              -o -name "*.app.tar.gz" \
+              -o -name "*.app.tar.gz.sig" \
+              -o -name "*.AppImage" \
+              -o -name "*.AppImage.sig" \
+              -o -name "*.deb" \
+              -o -name "*.rpm" \
+              -o -name "*.msi" \
+              -o -name "*.msi.zip" \
+              -o -name "*.msi.zip.sig" \
+              -o -name "*-setup.exe" \
+              -o -name "*-setup.nsis.zip" \
+              -o -name "*-setup.nsis.zip.sig" \
+              \) \
+              -exec cp -v {} artifacts/ \;
+          done
+          echo "--- Collected artifacts ---"
+          ls -la artifacts/
+
+      - name: Upload bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.artifact_name }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
       - name: Resolve release tag
         id: tag
         shell: bash
@@ -98,15 +150,22 @@ jobs:
             echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download all bundle artifacts
+        uses: actions/download-artifact@v4
         with:
-          projectPath: chaoxing-desktop
-          tagName: ${{ steps.tag.outputs.value }}
-          releaseName: "超星学习通助手 ${{ steps.tag.outputs.value }}"
-          releaseBody: |
+          path: bundles
+          pattern: bundle-*
+          merge-multiple: true
+
+      - name: List downloaded files
+        run: ls -la bundles/
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: "超星学习通助手 ${{ steps.tag.outputs.value }}"
+          body: |
             自动构建的桌面版发布。
 
             ### 安装包说明
@@ -116,6 +175,7 @@ jobs:
             - **Linux**: `*.AppImage` / `*.deb`
 
             > 完整功能与配置说明见 [README](https://github.com/${{ github.repository }}#readme)
-          releaseDraft: true
+          files: bundles/*
+          draft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          fail_on_unmatched_files: true
