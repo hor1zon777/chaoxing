@@ -44,11 +44,6 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - name: Cache Rust build
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: chaoxing-desktop/src-tauri -> target
-
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |

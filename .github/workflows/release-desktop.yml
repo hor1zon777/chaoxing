@@ -60,12 +60,6 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Cache Rust build
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: chaoxing-desktop/src-tauri -> target
-          key: ${{ matrix.rust_target }}
-
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
