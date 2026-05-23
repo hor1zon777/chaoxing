@@ -1,0 +1,115 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.1)"
+        required: true
+        default: "v0.0.0-dev"
+
+jobs:
+  build-tauri:
+    name: Build (${{ matrix.platform }})
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            rust_target: aarch64-apple-darwin
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            rust_target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+            rust_target: x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            args: ""
+            rust_target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: chaoxing-desktop/pnpm-lock.yaml
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: chaoxing-desktop/src-tauri -> target
+          key: ${{ matrix.rust_target }}
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev
+
+      - name: Install frontend dependencies
+        working-directory: chaoxing-desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: chaoxing-desktop
+          tagName: ${{ steps.tag.outputs.value }}
+          releaseName: "超星学习通助手 ${{ steps.tag.outputs.value }}"
+          releaseBody: |
+            自动构建的桌面版发布。
+
+            ### 安装包说明
+            - **Windows**: `*.exe` (NSIS 安装包)
+            - **macOS (Apple Silicon)**: `*_aarch64.dmg`
+            - **macOS (Intel)**: `*_x64.dmg`
+            - **Linux**: `*.AppImage` / `*.deb`
+
+            > 完整功能与配置说明见 [README](https://github.com/${{ github.repository }}#readme)
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

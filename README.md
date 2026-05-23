@@ -1,149 +1,227 @@
-# :computer: 超星学习通自动化完成任务点(命令行版)
+# 超星学习通助手（桌面 UI 版）
 
 <p align="center">
-    <a href="https://github.com/Samueli924/chaoxing" target="_blank" style="margin-right: 20px; font-style: normal; text-decoration: none;">
-        <img src="https://img.shields.io/github/stars/Samueli924/chaoxing" alt="Github Stars" />
-    </a>
-    <a href="https://github.com/Samueli924/chaoxing" target="_blank" style="margin-right: 20px; font-style: normal; text-decoration: none;">
-        <img src="https://img.shields.io/github/forks/Samueli924/chaoxing" alt="Github Forks" />
-    </a>
-    <a href="https://github.com/Samueli924/chaoxing" target="_blank" style="margin-right: 20px; font-style: normal; text-decoration: none;">
-        <img src="https://img.shields.io/github/languages/code-size/Samueli924/chaoxing" alt="Code-size" />
-    </a>
-    <a href="https://github.com/Samueli924/chaoxing" target="_blank" style="margin-right: 20px; font-style: normal; text-decoration: none;">
-        <img src="https://img.shields.io/github/v/release/Samueli924/chaoxing?display_name=tag&sort=semver" alt="version" />
-    </a>
+  <a href="https://github.com/hor1zon777/chaoxing/stargazers">
+    <img src="https://img.shields.io/github/stars/hor1zon777/chaoxing" alt="Github Stars" />
+  </a>
+  <a href="https://github.com/hor1zon777/chaoxing/network/members">
+    <img src="https://img.shields.io/github/forks/hor1zon777/chaoxing" alt="Github Forks" />
+  </a>
+  <a href="https://github.com/hor1zon777/chaoxing/releases">
+    <img src="https://img.shields.io/github/v/release/hor1zon777/chaoxing?display_name=tag&sort=semver" alt="version" />
+  </a>
+  <a href="https://github.com/hor1zon777/chaoxing/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/hor1zon777/chaoxing" alt="License" />
+  </a>
 </p>
-:muscle: 本项目的最终目的是通过开源消灭所谓的付费刷课平台，希望有能力的朋友都可以为这个项目提交代码，支持本项目的良性发展
 
-:star: 觉得有帮助的朋友可以给个Star
+基于 [Samueli924/chaoxing](https://github.com/Samueli924/chaoxing) 命令行版重写的**桌面图形化版本**，使用 **Tauri 2 + Rust + React + TypeScript** 构建。
 
-## :point_up: 更新通知
-20241021更新通知： 感谢[sz134055](https://github.com/sz134055)提交代码[PR #360](https://github.com/Samueli924/chaoxing/pull/360)，**添加了对题库答题的支持**  
+> ⚠️ 仅供学习交流使用，请遵守原项目的 [GPL-3.0](LICENSE) 协议，禁止用于盈利或违法用途。
 
-## :books: 使用方法
+---
 
-### 源码运行（Python 3.13+）
+## 截图预览
 
-1. clone 项目至本地
+> _截图占位：可在发布后补充_
+>
+> - 登录页 / 课程列表
+> - 任务配置 / 进度实时面板
+> - 设置（题库、AI、通知）
 
-```bash
-git clone --depth=1 https://github.com/Samueli924/chaoxing 
-cd chaoxing
-```
+---
 
-2. 安装依赖
+## 功能特性
 
-```bash
-pip install -r requirements.txt
-```
-或使用 `pip install .`（通过 pyproject.toml 安装依赖）
+### 核心能力
 
-3. (可选直接运行)
+- **多账号管理**：账号加密存储、一键切换；支持账号密码登录与 Cookie 登录两种方式
+- **课程列表 & 任务树**：自动拉取课程，按章节 / 任务点筛选，支持快捷选择与批量勾选
+- **任务点执行**：覆盖视频、音频、文档、阅读、章节检测（作业）、直播全部任务类型
+- **403 自动恢复**：视频任务遇到 403 自动刷新 dtoken 并重试，最多 2 次
+- **字体反混淆**：内置字体 glyph 二进制解析 + 哈希索引，解决作业题目里字体加密导致的乱码
 
-```bash
-python main.py
-```
+### 并发与控制
 
-4. (可选配置文件运行)
+- **章节内任务并发**（`tasksPerChapter`，1–8）：同一章节内多个任务点并行执行
+- **跨章节并发**（`chaptersPerCourse`，1–8）：同时处理多个章节，注意可能突破平台顺序解锁约束
+- **多课程并发**（`jobs`，1–16）：同时学习多门课程
+- **暂停 / 恢复 / 取消**：所有任务类型（含 Document/Read/Work）均能即时响应暂停信号
+- **协作式取消**：基于 `Arc<AtomicBool>` 全链路传播，可在任意阶段安全终止
 
-> 复制config_template.ini文件为config.ini文件，修改文件内的账号密码内容
+### 题库与 AI 答题
 
-```bash
-python main.py -c config.ini
-```
+- **多题库支持**：言溪、Like、TikuAdapter，可同时配置多个 Token
+- **AI 答题**：兼容任意 OpenAI 接口（OpenAI、DeepSeek、Kimi、智谱、Ollama 等），可设代理
+- **SiliconFlow 直连**：内置硅基流动适配器
+- **本地缓存**：答案缓存到本地 JSON，重复题目无需再查
+- **提交策略**：可配置题库覆盖率阈值、是否自动提交
+- **启动连接检查**：开始任务前自动校验 LLM 连接可用性
 
-5. (可选命令行运行)
+### 通知
 
-```bash
-python main.py -u 手机号 -p 密码 -l 课程ID1,课程ID2,课程ID3...(可选) -a [retry|ask|continue](可选)
-```
+- 支持 Server 酱、Qmsg、Bark、Telegram
+- 任务全部完成或出错时主动推送
 
-> Tips:  
-> 如果已安装低版本 Python 推荐使用 `uv` 运行：
+### 持久化与设置
 
-```bash
-uv run --python 3.13 main.py
-```
+- 配置自动加载 / 保存到系统 AppConfig 目录
+- 兼容 Python 版 INI 配置一键导入
+- 设置分 **通用 / 题库 / 通知** 三 Tab，dirty 状态实时提示未保存修改
 
-使用配置文件运行 ：
-```bash
-uv run --python 3.13 main.py -c config.ini
-```
+---
 
-### 打包文件运行
-1. 从最新[Releases](https://github.com/Samueli924/chaoxing/releases)中下载exe文件
-2. (可选直接运行) 双击运行即可
-3. (可选配置文件运行) 下载config_template.ini文件保存为config.ini文件，修改文件内的账号密码内容, 执行 `./chaoxing.exe -c config.ini`
-4. (可选命令行运行)`./chaoxing.exe -u "手机号" -p "密码" -l 课程ID1,课程ID2,课程ID3...(可选) -a [retry|ask|continue](可选)`
+## 快速开始
 
-### Docker运行
-1. 构建Docker镜像
-   ```bash
-   docker build -t chaoxing .
-   ```
+### 下载预编译版本（推荐）
 
-2. 运行Docker容器
-   ```bash
-   # 直接运行（将使用默认配置模板）
-   docker run -it chaoxing
-   
-   # 使用自定义配置文件运行
-   docker run -it -v /本地路径/config.ini:/config/config.ini chaoxing
-   ```
+前往 [Releases](https://github.com/hor1zon777/chaoxing/releases) 下载对应平台安装包：
 
-3. 配置说明
-   - Docker版本默认使用挂载到 `/config/config.ini` 的配置文件
-   - 首次运行时，会自动将 `config_template.ini` 复制到该位置作为模板
-   - 可以将本地编辑好的配置文件挂载到容器中，按照上述示例命令操作
+| 平台 | 文件 |
+|------|------|
+| Windows | `*.exe` (NSIS 安装包) |
+| macOS | `*.dmg` (Intel / Apple Silicon) |
+| Linux | `*.AppImage` / `*.deb` |
 
-### 题库配置说明
+双击安装即可，无需额外依赖。
 
-在你的配置文件中找到`[tiku]`，按照注释填写想要使用的题库名（即`provider`，大小写要一致），并填写必要信息，如token，然后在启动时添加`-c [你的配置文件路径]`即可。
+### 首次使用
 
-题库会默认使用根目录下的`config.ini`文件中的配置，所以你可以复制配置模板（参照前面的说明）命名为`config.ini`，并只配置题库项`[tiku]`，这样即使你不填写账号之类的信息，不使用`-c`参数指定配置文件，题库也会根据这个配置文件自动配置并启用。
+1. 启动后用**手机号 + 密码**或粘贴**浏览器 Cookies** 登录
+2. 进入「课程」页面，选择需要学习的课程
+3. 进入课程详情，配置要学习的章节与任务点
+4. 进入「任务」页面，开始学习
+5. （可选）打开「设置」配置题库、AI、通知
 
-对于那些有章节检测且任务点需要解锁的课程，必须配置题库。
+---
 
-**提交模式与答题**
-不配置题库（既不提供配置文件，也没有放置默认配置文件`config.ini`或填写要使用的题库）视为不使用题库，对于章节检测等需要答题的任务会自动跳过。
-题库覆盖率：搜到的题目占总题目的比例
-提交模式`submit`值为
+## 从源码构建
 
-- `true`：会答完题，达到题库题目覆盖率提交，没达到只保存，**正确率不做保证**。
-- `false`：会答题，但是不会提交，仅保存搜到答案的，随后你可以自行前往学习通查看、修改、提交。**任何填写不正确的`submit`值会被视为`false`**
+### 环境要求
 
-> 题库名即`answer.py`模块中根据`Tiku`类实现的具体题库类，例如`TikuYanxi`（言溪题库），在填写时，请务必保持大小写一致。
+- **Node.js** ≥ 18，[pnpm](https://pnpm.io/) ≥ 8
+- **Rust** ≥ 1.75（含 cargo）
+- 平台依赖：[Tauri 系统要求](https://v2.tauri.app/start/prerequisites/)
 
-### 已关闭任务点处理配置说明
-
-在配置文件的 `[common]` 部分，可以通过 `notopen_action` 选项配置遇到已关闭任务点时的处理方式:
-
-- `retry` (默认): 遇到关闭的任务点时尝试重新完成上一个任务点，如果连续重试 3 次仍然失败 (或未配置题库及自动提交) 则停止
-- `ask`: 遇到关闭的任务点时询问用户是否继续。选择继续后会自动跳过连续的关闭任务点，直到遇到开放的任务点
-- `continue`: 自动跳过所有关闭的任务点，继续检查和完成后续任务点
-
-也可以通过命令行参数 `-a` 或 `--notopen-action` 指定处理方式，例如：
+### 步骤
 
 ```bash
-python main.py -a ask  # 使用询问模式
+git clone https://github.com/hor1zon777/chaoxing.git
+cd chaoxing/chaoxing-desktop
+
+pnpm install
+
+# 开发模式（热重载）
+pnpm tauri dev
+
+# 生产打包
+pnpm tauri build
 ```
 
-**外部通知配置说明**
+打包产物位于 `chaoxing-desktop/src-tauri/target/release/bundle/`。
 
-这功能会在所有课程学习任务结束后，或是程序出现错误时，使用外部通知服务推送消息告知你（~~有用但不多~~）
+---
 
-与题库配置类似，不填写视为不使用，按照注释填写想要使用的外部通知服务（也是`provider`，大小写要一致），并填写必要的`url`
+## 项目结构
 
-## :heart: CONTRIBUTORS
+```
+chaoxing/
+├── chaoxing-desktop/           # 桌面应用（Tauri）
+│   ├── src/                    # 前端 React + TypeScript
+│   │   ├── routes/             # 页面（Login / Courses / Task / Settings）
+│   │   ├── stores/             # Zustand 状态切片
+│   │   ├── types/              # 类型定义
+│   │   └── components/         # 通用组件
+│   └── src-tauri/              # 后端 Rust
+│       ├── src/
+│       │   ├── api/            # 超星 API（client / video / work / live / ...）
+│       │   ├── commands/       # Tauri IPC 命令
+│       │   ├── task/           # 调度器与章节/任务执行
+│       │   ├── tiku/           # 题库适配（言溪 / Like / AI / SiliconFlow）
+│       │   ├── parser/         # HTML / JSON 解析
+│       │   ├── font/           # 字体反混淆
+│       │   ├── crypto/         # AES / 视频签名
+│       │   └── notification/   # 通知（Server酱 / Qmsg / Bark / Telegram）
+│       └── tauri.conf.json
+├── api/, main.py, ...          # 原 Python CLI 版本（保留）
+└── .github/workflows/          # CI / Release 工作流
+```
 
-![Alt](https://repobeats.axiom.co/api/embed/d3931e84b4b2f17cbe60cafedb38114bdf9931cb.svg "Repobeats analytics image")  
+---
 
-<a style="margin-top: 15px" href="https://github.com/Samueli924/chaoxing/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Samueli924/chaoxing" />
-</a>
+## 配置说明
 
-## :warning: 免责声明
-- 本代码遵循 [GPL-3.0 License](https://github.com/Samueli924/chaoxing/blob/main/LICENSE) 协议，允许**开源/免费使用和引用/修改/衍生代码的开源/免费使用**，不允许**修改和衍生的代码作为闭源的商业软件发布和销售**，禁止**使用本代码盈利**，以此代码为基础的程序**必须**同样遵守 [GPL-3.0 License](https://github.com/Samueli924/chaoxing/blob/main/LICENSE) 协议
-- 本代码仅用于**学习讨论**，禁止**用于盈利**
-- 他人或组织使用本代码进行的任何**违法行为**与本人无关
+应用配置保存在系统 AppConfig 目录：
+
+| 平台 | 路径 |
+|------|------|
+| Windows | `%APPDATA%\com.chaoxing.desktop\config.json` |
+| macOS | `~/Library/Application Support/com.chaoxing.desktop/config.json` |
+| Linux | `~/.config/com.chaoxing.desktop/config.json` |
+
+### 主要字段
+
+| 字段 | 说明 | 范围 |
+|------|------|------|
+| `speed` | 视频倍速 | 1.0 – 2.0 |
+| `jobs` | 多课程并发 | 1 – 8 |
+| `tasksPerChapter` | 章节内任务并发 | 1 – 8 |
+| `chaptersPerCourse` | 跨章节并发 | 1 – 8 |
+| `notopenAction` | 未开放章节处理 | `retry` / `continue` |
+| `tikuProvider` | 题库类型 | `yanxi` / `like` / `ai` / `siliconflow` / `tikuadapter` |
+| `tikuSubmit` | 是否自动提交 | bool |
+| `tikuCoverRate` | 题库覆盖率阈值 | 0 – 1 |
+| `tikuDelay` | 查询间隔（秒） | ≥ 0 |
+| `aiMinInterval` | AI 请求最小间隔（秒） | ≥ 0 |
+| `notificationProvider` | 通知类型 | `serverchan` / `qmsg` / `bark` / `telegram` |
+
+> 完整字段见 [`src/types/config.ts`](chaoxing-desktop/src/types/config.ts)。
+
+### 从 Python 版迁移
+
+在「设置」页面点击「导入 INI」选择原 `config.ini`，会自动转换字段并保存。
+
+---
+
+## 与 Python CLI 版的差异
+
+| 维度 | Python CLI | 桌面 UI |
+|------|-----------|--------|
+| 交互 | 终端 | 图形界面 + 实时进度面板 |
+| 并发 | 多课程 + 章节内 | 多课程 + 章节内 + 跨章节，三级并发 |
+| 状态管理 | 进程级 | Zustand 切片 + AppState |
+| 暂停/取消 | Ctrl+C | UI 按钮，毫秒级响应所有任务类型 |
+| 配置 | INI | JSON（兼容 INI 导入） |
+| 答题缓存 | 进程内 | 本地 JSON 持久化 |
+| 字体反混淆 | 远程 hash 表 | 本地 glyph 二进制解析（更快、可离线） |
+
+---
+
+## 测试与质量
+
+- **133 个 Rust 单元测试**全部通过（`cargo test --lib`）
+- **TypeScript strict**：`pnpm tsc --noEmit` 零错误
+- **零警告编译**：`cargo check`、`cargo clippy`
+
+---
+
+## 致谢
+
+- 原项目 [Samueli924/chaoxing](https://github.com/Samueli924/chaoxing) 及所有贡献者
+- 题库适配参考 [sz134055](https://github.com/sz134055) 的工作
+- UI 设计参考 Apple Design Resources
+
+---
+
+## 免责声明
+
+- 本项目遵循 [GPL-3.0 License](LICENSE)，允许开源/免费使用、引用、修改、衍生代码的开源/免费使用；**不允许**将修改或衍生代码作为闭源商业软件发布或销售，禁止以本代码为基础盈利
+- 本代码**仅供学习讨论**
+- 使用者使用本代码进行的任何违法行为与作者无关
+- 使用本工具可能违反学习通的服务条款，由此产生的账号风险由使用者自行承担
+
+---
+
+## License
+
+[GPL-3.0](LICENSE) © 原作者 [Samueli924](https://github.com/Samueli924) 及本项目贡献者
