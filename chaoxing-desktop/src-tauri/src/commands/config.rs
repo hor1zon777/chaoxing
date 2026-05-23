@@ -44,6 +44,9 @@ pub async fn save_config(
 }
 
 /// 加载配置（启动时调用）
+///
+/// 若配置文件存在但解析失败，应返回错误而非静默回退默认值——
+/// 否则下次 save_config 会把用户的 AI key / 题库 token 等冲掉
 #[tauri::command]
 pub async fn load_config(
     state: State<'_, AppState>,
@@ -52,7 +55,14 @@ pub async fn load_config(
     let path = config_file_path(&app).await;
     if path.exists() {
         let content = tokio::fs::read_to_string(&path).await?;
-        let config: AppConfig = serde_json::from_str(&content).unwrap_or_default();
+        let config: AppConfig = serde_json::from_str(&content).map_err(|e| {
+            tracing::error!(
+                "配置解析失败（路径: {:?}, 错误: {}），拒绝覆盖现有配置以防数据丢失",
+                path,
+                e
+            );
+            AppError::Config(format!("配置文件已损坏: {}（路径: {:?}）", e, path))
+        })?;
         let mut current = state.config.write().await;
         *current = config.clone();
         Ok(config)

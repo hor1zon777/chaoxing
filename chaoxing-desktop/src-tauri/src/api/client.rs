@@ -45,7 +45,16 @@ impl HttpClient {
             .default_headers(headers)
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("创建 HTTP 客户端失败");
+            .unwrap_or_else(|e| {
+                // 命令路径上若 panic 会让整个 Tauri runtime 崩溃；
+                // 回退到无定制 headers 的最小客户端，保证应用不死
+                tracing::error!("创建 HTTP 客户端失败: {}，回退为默认客户端", e);
+                Client::builder()
+                    .cookie_provider(cookie_store.clone())
+                    .timeout(std::time::Duration::from_secs(30))
+                    .build()
+                    .unwrap_or_default()
+            });
 
         Self {
             client,
@@ -77,7 +86,15 @@ impl HttpClient {
             .redirect(Policy::none())
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("创建无重定向 HTTP 客户端失败")
+            .unwrap_or_else(|e| {
+                tracing::error!("创建无重定向 HTTP 客户端失败: {}，回退为默认客户端", e);
+                Client::builder()
+                    .cookie_provider(self.cookie_store.clone())
+                    .redirect(Policy::none())
+                    .timeout(std::time::Duration::from_secs(30))
+                    .build()
+                    .unwrap_or_default()
+            })
     }
 
     /// 从 cookie store 获取指定 cookie 的值

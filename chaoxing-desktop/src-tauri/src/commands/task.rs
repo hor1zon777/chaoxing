@@ -57,7 +57,9 @@ pub async fn start_course_tasks(
     // 激活日志桥接：所有 tracing 事件将转发到前端
     log_bridge::set_log_channel(tx.clone());
 
-    tokio::spawn(async move {
+    // 保留 forwarder 句柄，函数退出前 await，避免多次进入时旧 forwarder 仍在跑、
+    // 把后续 session 的事件错位归入新 channel
+    let forwarder = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             let _ = channel.send(event);
         }
@@ -152,7 +154,18 @@ pub async fn start_course_tasks(
         let chapters_per_course = chapters_per_course;
 
         let handle = tokio::spawn(async move {
-            let _permit = semaphore.acquire_owned().await;
+            // semaphore 关闭时直接返回错误，避免许可缺失导致并发上限失效
+            let _permit = match semaphore.acquire_owned().await {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = tx.send(TaskEvent::Log {
+                        level: "error".to_string(),
+                        message: format!("获取课程并发许可失败: {}", e),
+                        timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                    });
+                    return Err(AppError::Other(format!("信号量已关闭: {}", e)));
+                }
+            };
 
             let selected_points = course.selected_points.len();
             let selected_jobs = course
@@ -273,6 +286,11 @@ pub async fn start_course_tasks(
 
     // 清除日志桥接，停止追踪事件转发
     log_bridge::clear_log_channel();
+
+    // drop 最后一个 sender 让 forwarder 的 rx.recv() 返回 None 而退出循环；
+    // 然后 await 它结束，避免函数返回后旧 forwarder 仍存活导致事件错位
+    drop(tx);
+    let _ = forwarder.await;
 
     match task_error {
         Some(e) => Err(e),

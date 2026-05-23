@@ -48,10 +48,10 @@ pub async fn run_live(
         .and_then(|d| d.as_u64())
         .unwrap_or(30 * 60); // 默认 30 分钟
 
-    // 根据倍速调整时长，向上取整为分钟
+    // 根据倍速调整时长，向上取整为分钟；至少 1 分钟，避免 duration_secs=0 时秒过却看似 Success
     let speed = if speed <= 0.0 { 1.0 } else { speed };
     let adjusted = duration_secs as f64 / speed;
-    let total_minutes = ((adjusted as u64) + 59) / 60;
+    let total_minutes = (((adjusted as u64) + 59) / 60).max(1);
 
     tracing::info!(
         "开始刷取直播 '{}'，总时长 {} 分钟（已根据倍速调整）",

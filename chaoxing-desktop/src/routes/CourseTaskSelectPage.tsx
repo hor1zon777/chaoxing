@@ -66,9 +66,12 @@ export function CourseTaskSelectPage() {
     void fetchCourses();
   }, [courseId, courses.length, fetchCourses]);
 
+  // 依赖 courseId（稳定字符串）而非 course 派生对象，
+  // 否则 courses 数组刷新时 course 引用变化会触发重复 activateCourse 抓树
   useEffect(() => {
     if (course) void activateCourse(course);
-  }, [course, activateCourse]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, activateCourse]);
 
   const flatJobs = useMemo(
     () => (courseId ? getFlatJobsForCourse(courseId) : []),

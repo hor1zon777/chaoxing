@@ -4,7 +4,7 @@
 //! 根据 JobType 分发到对应的处理函数
 
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::api::client::HttpClient;
 use crate::api::{document, read, video, work};
@@ -36,6 +36,18 @@ pub async fn process_job(
     is_running: &Arc<AtomicBool>,
     is_paused: &Arc<AtomicBool>,
 ) -> Result<StudyResult, AppError> {
+    // 入口处响应暂停：Document/Read/Work 类型是一次性 await，内部不感知暂停，
+    // 必须在分发前阻塞才能让"暂停"语义在并发模式下贯穿所有任务类型
+    if !is_running.load(Ordering::SeqCst) {
+        return Ok(StudyResult::Cancelled);
+    }
+    while is_paused.load(Ordering::SeqCst) {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        if !is_running.load(Ordering::SeqCst) {
+            return Ok(StudyResult::Cancelled);
+        }
+    }
+
     match job.job_type {
         JobType::Video => {
             tracing::info!("识别到视频任务: {}", job.name);

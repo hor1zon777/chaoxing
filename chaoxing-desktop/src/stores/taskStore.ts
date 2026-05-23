@@ -63,6 +63,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               courseTitle: event.courseTitle,
               completedChapters: 0,
               totalChapters: event.totalChapters,
+              completedJobs: 0,
+              totalJobs: 0,
               status: "running",
             },
           },
@@ -85,6 +87,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
                 ...prev,
                 status: "completed",
                 completedChapters: prev.totalChapters,
+                // 课程完成时把 jobs 也置满，避免兜底显示 99%
+                completedJobs: Math.max(prev.completedJobs, prev.totalJobs),
               },
             },
           };
@@ -109,6 +113,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       case "chapterStarted": {
+        // 累加 totalJobs 作为 jobCompleted 推进的分母
+        set((state) => {
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return {};
+          return {
+            courseProgress: {
+              ...state.courseProgress,
+              [event.courseId]: {
+                ...prev,
+                totalJobs: prev.totalJobs + event.jobCount,
+              },
+            },
+          };
+        });
         addLog(
           "info",
           `章节开始: ${event.chapterTitle} (${event.jobCount} 个任务)`,
@@ -163,11 +181,23 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       case "jobCompleted": {
-        // 任务完成后移除对应的视频进度
+        // 任务完成后移除对应的视频进度，同时累加 completedJobs 作为兜底进度推进
+        // （后端某条路径漏 chapterCompleted 时仍能让 UI 进度向前走）
         set((state) => {
           const { [event.jobId]: _removed, ...restVideoProgress } =
             state.videoProgress;
-          return { videoProgress: restVideoProgress };
+          const prev = state.courseProgress[event.courseId];
+          if (!prev) return { videoProgress: restVideoProgress };
+          return {
+            videoProgress: restVideoProgress,
+            courseProgress: {
+              ...state.courseProgress,
+              [event.courseId]: {
+                ...prev,
+                completedJobs: prev.completedJobs + 1,
+              },
+            },
+          };
         });
         addLog("info", `任务完成: ${event.jobName}`);
         break;

@@ -208,25 +208,29 @@ impl TikuAi {
     }
 
     /// 等待请求间隔
+    ///
+    /// 用"下一次允许时间"语义（而不是上次请求时间）来正确处理并发预占：
+    /// - 当前时刻 < 下次允许时间 → 排在下次允许时间之后，按 min_interval 排队
+    /// - 当前时刻 ≥ 下次允许时间 → 立即放行，更新下次允许时间为 now + min_interval
+    /// 这样可以避免向 last_request_time 写入未来时间戳导致 elapsed() 在"未来时刻"
+    /// 上恒为 0、节流近似失效的 bug。
     async fn wait_for_interval(&self) {
         let sleep_duration = {
-            let mut last = self.last_request_time.lock().await;
-            if let Some(last_time) = *last {
-                let elapsed = last_time.elapsed();
-                let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
-                if elapsed < min_interval {
-                    let sleep_time = min_interval - elapsed;
+            let mut next_allowed = self.last_request_time.lock().await;
+            let min_interval = std::time::Duration::from_secs(self.min_interval_secs as u64);
+            let now = Instant::now();
+            match *next_allowed {
+                Some(allowed_at) if allowed_at > now => {
+                    let sleep_time = allowed_at - now;
                     tracing::debug!("AI 请求间隔过短，等待 {:?}", sleep_time);
-                    // 预占时间槽，防止并发请求同时通过
-                    *last = Some(Instant::now() + sleep_time);
+                    // 预占下一个时间槽：把下次允许时间推到 allowed_at + interval
+                    *next_allowed = Some(allowed_at + min_interval);
                     Some(sleep_time)
-                } else {
-                    *last = Some(Instant::now());
+                }
+                _ => {
+                    *next_allowed = Some(now + min_interval);
                     None
                 }
-            } else {
-                *last = Some(Instant::now());
-                None
             }
         };
         if let Some(d) = sleep_duration {

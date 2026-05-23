@@ -305,19 +305,11 @@ pub async fn study_video(
             }
         }
 
-        // 到达上报间隔
-        if play_time - last_log_time >= wait_time || play_time == duration {
+        // 已到达满时长：只做完成检查，不再模拟播放
+        if play_time == duration {
             let (passed, status) = video_progress_log(
-                client,
-                course_id,
-                clazz_id,
-                cpi,
-                job,
-                job_info,
-                &current_dtoken,
-                duration,
-                play_time,
-                media_type,
+                client, course_id, clazz_id, cpi, job, job_info,
+                &current_dtoken, duration, play_time, media_type,
             )
             .await?;
 
@@ -337,7 +329,59 @@ pub async fn study_video(
                 let retry_delay = rand::thread_rng().gen_range(2.0..4.0);
                 tokio::time::sleep(Duration::from_secs_f64(retry_delay)).await;
 
-                // 尝试刷新视频状态获取新 dtoken
+                if let Ok(Some((new_dtoken, _, _))) =
+                    fetch_video_info(client, &job.objectid, &fid, referer).await
+                {
+                    current_dtoken = new_dtoken;
+                }
+                continue;
+            } else if status != 200 {
+                return Ok(StudyResult::Error);
+            }
+
+            // 服务器尚未确认完成，等待后重试
+            let retry_delay = rand::thread_rng().gen_range(10u64..=20);
+            for _ in 0..retry_delay {
+                if !is_running.load(Ordering::SeqCst) {
+                    tracing::info!("视频任务已取消: {}", job.name);
+                    return Ok(StudyResult::Cancelled);
+                }
+                while is_paused.load(Ordering::SeqCst) {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    if !is_running.load(Ordering::SeqCst) {
+                        tracing::info!("视频任务已取消: {}", job.name);
+                        return Ok(StudyResult::Cancelled);
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            continue;
+        }
+
+        // 到达上报间隔（saturating 避免未来 reset play_time 时溢出 panic）
+        if play_time.saturating_sub(last_log_time) >= wait_time {
+            let (passed, status) = video_progress_log(
+                client, course_id, clazz_id, cpi, job, job_info,
+                &current_dtoken, duration, play_time, media_type,
+            )
+            .await?;
+
+            if passed {
+                tracing::info!("任务完成: {}", job.name);
+                return Ok(StudyResult::Success);
+            }
+
+            if status == 403 {
+                if forbidden_retry >= max_forbidden_retry {
+                    tracing::warn!("403 重试上限，跳过任务");
+                    return Ok(StudyResult::Forbidden);
+                }
+                forbidden_retry += 1;
+                tracing::warn!("出现 403，尝试恢复 (第 {} 次)", forbidden_retry);
+
+                let retry_delay = rand::thread_rng().gen_range(2.0..4.0);
+                tokio::time::sleep(Duration::from_secs_f64(retry_delay)).await;
+
                 if let Ok(Some((new_dtoken, _, _))) =
                     fetch_video_info(client, &job.objectid, &fid, referer).await
                 {
@@ -352,19 +396,17 @@ pub async fn study_video(
             last_log_time = play_time;
         }
 
-        if play_time < duration {
-            play_time = ((play_time as f64) + LOOP_INTERVAL * speed)
-                .min(duration as f64) as u64;
+        play_time = ((play_time as f64) + LOOP_INTERVAL * speed)
+            .min(duration as f64) as u64;
 
-            if let Some(tx) = event_tx {
-                let _ = tx.send(TaskEvent::VideoProgress {
-                    course_id: course_id.to_string(),
-                    job_id: job.jobid.clone(),
-                    job_name: job.name.clone(),
-                    current_time: play_time,
-                    total_duration: duration,
-                });
-            }
+        if let Some(tx) = event_tx {
+            let _ = tx.send(TaskEvent::VideoProgress {
+                course_id: course_id.to_string(),
+                job_id: job.jobid.clone(),
+                job_name: job.name.clone(),
+                current_time: play_time,
+                total_duration: duration,
+            });
         }
 
         tokio::time::sleep(Duration::from_secs_f64(LOOP_INTERVAL)).await;

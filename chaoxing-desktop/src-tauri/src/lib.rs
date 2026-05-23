@@ -39,15 +39,35 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // 启动时自动加载配置（确保持久化配置在任务开始前已就绪）
+            // blocking_write 在 tokio 异步 runtime 中调用会 panic，
+            // 这里用 async_runtime::block_on 在同步 setup 中安全获取异步锁
             let state = app.state::<AppState>();
             let config_dir = app.path().app_config_dir().unwrap_or_default();
             let config_path = config_dir.join("config.json");
             if config_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&config_path) {
-                    if let Ok(config) = serde_json::from_str(&content) {
-                        let mut current = state.config.blocking_write();
-                        *current = config;
-                        tracing::info!("启动时加载配置: {:?}", config_path);
+                match std::fs::read_to_string(&config_path) {
+                    Ok(content) => match serde_json::from_str::<crate::models::config::AppConfig>(&content) {
+                        Ok(config) => {
+                            tauri::async_runtime::block_on(async {
+                                let mut current = state.config.write().await;
+                                *current = config;
+                            });
+                            tracing::info!("启动时加载配置: {:?}", config_path);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "启动时配置解析失败，将保留默认配置（路径: {:?}, 错误: {}）",
+                                config_path,
+                                e
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        tracing::error!(
+                            "启动时配置读取失败（路径: {:?}, 错误: {}）",
+                            config_path,
+                            e
+                        );
                     }
                 }
             }

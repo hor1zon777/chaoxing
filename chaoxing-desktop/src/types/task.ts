@@ -194,6 +194,10 @@ export interface CourseProgress {
   courseTitle: string;
   completedChapters: number;
   totalChapters: number;
+  /** 已完成的 job 总数（容错用：当 chapterCompleted 漏发时仍能推进 UI 进度） */
+  completedJobs: number;
+  /** 已观察到的 job 总数（通过 chapterStarted.jobCount 累加） */
+  totalJobs: number;
   status: "pending" | "running" | "completed" | "error";
 }
 

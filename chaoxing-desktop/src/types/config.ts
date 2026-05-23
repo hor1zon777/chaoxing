@@ -18,7 +18,7 @@ export interface AppConfig {
   tikuSubmit: boolean;
   /** 题库覆盖率 */
   tikuCoverRate: number;
-  /** 题库延迟 (毫秒) */
+  /** 题库查询延迟 (秒)，后端按秒解析（from_secs_f64） */
   tikuDelay: number;
   /** AI 端点 */
   aiEndpoint: string;
@@ -28,7 +28,7 @@ export interface AppConfig {
   aiModel: string;
   /** AI 代理地址 */
   aiProxy: string;
-  /** AI 最小请求间隔 (毫秒) */
+  /** AI 最小请求间隔 (秒)，后端按秒解析（Duration::from_secs） */
   aiMinInterval: number;
   /** SiliconFlow 密钥 */
   siliconflowKey: string;

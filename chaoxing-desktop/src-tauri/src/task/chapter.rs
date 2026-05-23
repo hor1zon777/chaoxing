@@ -228,8 +228,6 @@ async fn run_jobs_parallel(
             break;
         }
 
-        emit_job_started(event_tx, course_id, chapter_id, &job);
-
         let semaphore = semaphore.clone();
         let client = client.clone();
         let course_id_t = course_id_owned.clone();
@@ -240,8 +238,11 @@ async fn run_jobs_parallel(
         let is_paused_t = is_paused.clone();
         let tiku_clone = tiku.clone();
         let event_tx_clone = event_tx_owned.clone();
+        let chapter_id_t = chapter_id.to_string();
 
         set.spawn(async move {
+            // 必须先拿到信号量许可，再发"开始"事件，避免出现
+            // 任务还在排队但前端已显示"已开始"的悬挂条目
             let _permit = match semaphore.acquire_owned().await {
                 Ok(p) => p,
                 Err(_) => {
@@ -251,6 +252,21 @@ async fn run_jobs_parallel(
                     );
                 }
             };
+
+            // 拿到许可后立即响应取消信号
+            if !is_running_t.load(Ordering::SeqCst) {
+                return (job, Ok(StudyResult::Cancelled));
+            }
+
+            // 拿到许可后响应暂停信号；并发模式下也能在新任务启动前生效
+            while is_paused_t.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                if !is_running_t.load(Ordering::SeqCst) {
+                    return (job, Ok(StudyResult::Cancelled));
+                }
+            }
+
+            emit_job_started(event_tx_clone.as_ref(), &course_id_t, &chapter_id_t, &job);
 
             let tiku_ref = tiku_clone.as_deref();
             let result = process_job(
@@ -297,10 +313,12 @@ async fn run_jobs_parallel(
         }
     }
 
-    if !is_running.load(Ordering::SeqCst) || cancelled {
-        ChapterResult::Cancelled
-    } else if has_error {
+    // 优先返回 Error：即便用户中途取消，有错误的章节仍应被统计为失败，
+    // 避免取消信号吞掉真实的失败原因
+    if has_error {
         ChapterResult::Error
+    } else if !is_running.load(Ordering::SeqCst) || cancelled {
+        ChapterResult::Cancelled
     } else {
         ChapterResult::Success
     }
