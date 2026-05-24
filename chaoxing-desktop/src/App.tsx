@@ -9,6 +9,7 @@ import { CoursesPage } from "./routes/CoursesPage";
 import { CourseTaskSelectPage } from "./routes/CourseTaskSelectPage";
 import { TaskPage } from "./routes/TaskPage";
 import { SettingsPage } from "./routes/SettingsPage";
+import { AboutPage } from "./routes/AboutPage";
 import { PillButton } from "./components/ui/appleUI";
 
 /** 路由守卫：未登录则跳转登录页 */
@@ -222,6 +223,7 @@ function App() {
             <Route path="courses/:courseId/tasks" element={<CourseTaskSelectPage />} />
             <Route path="tasks" element={<TaskPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="about" element={<AboutPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

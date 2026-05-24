@@ -1,6 +1,6 @@
 [package]
 name = "chaoxing-desktop"
-version = "0.1.0"
+version = "0.1.7"
 edition = "2021"
 description = "超星学习通桌面助手"
 license = "GPL-3.0"

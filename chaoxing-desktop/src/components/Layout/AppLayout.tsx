@@ -9,6 +9,7 @@ const navLinks = [
   { key: "/courses", label: "课程" },
   { key: "/tasks", label: "任务" },
   { key: "/settings", label: "设置" },
+  { key: "/about", label: "关于" },
 ];
 
 interface PageMeta {
@@ -25,6 +26,9 @@ function getPageMeta(pathname: string): PageMeta {
   }
   if (pathname.startsWith("/tasks")) {
     return { title: "任务" };
+  }
+  if (pathname.startsWith("/about")) {
+    return { title: "关于" };
   }
   return { title: "设置" };
 }
@@ -43,6 +47,7 @@ export function AppLayout() {
     if (location.pathname.startsWith("/courses")) return "/courses";
     if (location.pathname.startsWith("/tasks")) return "/tasks";
     if (location.pathname.startsWith("/settings")) return "/settings";
+    if (location.pathname.startsWith("/about")) return "/about";
     return "";
   }, [location.pathname]);
 
