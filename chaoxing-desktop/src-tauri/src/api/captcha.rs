@@ -27,7 +27,8 @@ pub async fn get_captcha(client: &HttpClient) -> Result<Vec<u8>, AppError> {
 }
 
 /// 提交验证码
-/// 成功返回 true（Python 中检测 302 重定向）
+/// 成功返回 true：Python 原版以 HTTP 302 重定向为成功标志，
+/// 这里使用不跟随重定向的客户端避免被跟到登录页后用 200 误判成功
 pub async fn submit_captcha(
     client: &HttpClient,
     code: &str,
@@ -36,12 +37,8 @@ pub async fn submit_captcha(
         "https://mooc1.chaoxing.com/html/processVerify.ac?ucode={}&app=0",
         code
     );
-    let resp = client
-        .client
-        .get(&url)
-        .send()
-        .await?;
-    // Python 中成功标志是 HTTP 302 重定向
-    // reqwest 默认跟随重定向，所以检查最终 URL 或状态
-    Ok(resp.status().is_success())
+    let no_redirect = client.client_builder_no_redirect();
+    let resp = no_redirect.get(&url).send().await?;
+    // 仅 3xx（典型为 302）视为成功；2xx / 4xx / 5xx 均视为失败
+    Ok(resp.status().is_redirection())
 }

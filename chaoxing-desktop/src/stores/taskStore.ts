@@ -2,12 +2,18 @@ import { create } from "zustand";
 import type {
   TaskEvent,
   LogEntry,
+  LogLevel,
   CourseProgress,
   VideoProgressInfo,
 } from "../types/task";
 
 /** 日志上限，超过后截断前半部分 */
 const MAX_LOGS = 5000;
+
+/** 构造 videoProgress 的复合 key —— 多课程并发时同 jobId 不会互相覆盖 */
+function videoProgressKey(courseId: string, jobId: string): string {
+  return `${courseId}:${jobId}`;
+}
 
 /** 任务状态 */
 interface TaskState {
@@ -17,7 +23,7 @@ interface TaskState {
   isPaused: boolean;
   /** 各课程进度 (courseId -> CourseProgress) */
   courseProgress: Record<string, CourseProgress>;
-  /** 各视频播放进度 (jobId -> VideoProgressInfo) */
+  /** 各视频播放进度（key = `${courseId}:${jobId}`） */
   videoProgress: Record<string, VideoProgressInfo>;
   /** 日志列表 */
   logs: LogEntry[];
@@ -27,7 +33,7 @@ interface TaskState {
   /** 处理后端推送的任务事件 */
   handleTaskEvent: (event: TaskEvent) => void;
   /** 添加一条日志 */
-  addLog: (level: string, message: string) => void;
+  addLog: (level: LogLevel, message: string) => void;
   /** 设置日志过滤级别 */
   setLogFilter: (filter: "all" | "info" | "warn" | "error") => void;
   /** 清空日志 */
@@ -184,8 +190,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         // 任务完成后移除对应的视频进度，同时累加 completedJobs 作为兜底进度推进
         // （后端某条路径漏 chapterCompleted 时仍能让 UI 进度向前走）
         set((state) => {
-          const { [event.jobId]: _removed, ...restVideoProgress } =
-            state.videoProgress;
+          const key = videoProgressKey(event.courseId, event.jobId);
+          const { [key]: _removed, ...restVideoProgress } = state.videoProgress;
           const prev = state.courseProgress[event.courseId];
           if (!prev) return { videoProgress: restVideoProgress };
           return {
@@ -212,7 +218,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         set((state) => ({
           videoProgress: {
             ...state.videoProgress,
-            [event.jobId]: {
+            [videoProgressKey(event.courseId, event.jobId)]: {
+              courseId: event.courseId,
               jobId: event.jobId,
               jobName: event.jobName,
               currentTime: event.currentTime,
@@ -227,7 +234,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         set((state) => ({
           videoProgress: {
             ...state.videoProgress,
-            [event.jobId]: {
+            [videoProgressKey(event.courseId, event.jobId)]: {
+              courseId: event.courseId,
               jobId: event.jobId,
               jobName: event.jobName,
               currentTime: event.currentMinute,
@@ -261,10 +269,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         addLog("info", "所有课程学习任务已完成");
         break;
       }
+
+      default: {
+        // 后端新增事件类型时给出运行时告警，方便定位前后端契约漂移
+        const unknown = event as { type?: string };
+        addLog(
+          "warn",
+          `收到未知任务事件类型: ${unknown?.type ?? "<missing type>"}（前端未实现处理）`,
+        );
+        break;
+      }
     }
   },
 
-  addLog: (level: string, message: string) => {
+  addLog: (level: LogLevel, message: string) => {
     const timestamp = new Date().toLocaleTimeString("zh-CN", {
       hour12: false,
     });

@@ -152,7 +152,8 @@ export interface WorkSubmittedEvent extends BaseTaskEvent {
 /** 日志事件 */
 export interface LogEvent extends BaseTaskEvent {
   type: "log";
-  level: string;
+  /** 后端 tracing 事件级别，受 RUST_LOG 影响 */
+  level: LogLevel;
   message: string;
   timestamp: string;
 }
@@ -181,9 +182,12 @@ export type TaskEvent =
   | LogEvent
   | AllTasksCompletedEvent;
 
+/** 日志级别（与后端 tracing Level 一一对应） */
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+
 /** 日志条目 */
 export interface LogEntry {
-  level: string;
+  level: LogLevel;
   message: string;
   timestamp: string;
 }
@@ -203,6 +207,8 @@ export interface CourseProgress {
 
 /** 视频播放进度信息 */
 export interface VideoProgressInfo {
+  /** 所属课程 ID（用于多课程并发时区分同名章节/同 jobId 的不同上下文） */
+  courseId: string;
   jobId: string;
   jobName: string;
   currentTime: number;

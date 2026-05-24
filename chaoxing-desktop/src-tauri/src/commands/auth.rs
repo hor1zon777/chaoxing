@@ -150,7 +150,23 @@ pub async fn login_with_cookies(
     state: State<'_, AppState>,
     cookies_text: String,
 ) -> Result<LoginResult, AppError> {
+    // 防御性长度限制：浏览器 cookie header 通常 < 8KB；超过 64KB 视为异常粘贴
+    const MAX_COOKIES_LEN: usize = 65_536;
+    if cookies_text.len() > MAX_COOKIES_LEN {
+        return Err(AppError::Other(format!(
+            "Cookie 文本过长（{} 字节），请确认是否复制了无关内容",
+            cookies_text.len()
+        )));
+    }
+    if cookies_text.trim().is_empty() {
+        return Err(AppError::Other("Cookie 文本为空".to_string()));
+    }
+
     let client = HttpClient::new();
+
+    // 过滤控制字符，避免请求头注入风险（按 RFC 7230，header value 中
+    // 不应出现除 HTAB 外的 ASCII 控制字符）
+    let is_valid_cookie_char = |c: char| !c.is_control() || c == '\t';
 
     let cookies = cookies_text
         .split(';')
@@ -160,14 +176,29 @@ pub async fn login_with_cookies(
                 return None;
             }
             let (name, value) = pair.split_once('=')?;
+            let name = name.trim();
+            let value = value.trim();
+            if name.is_empty() {
+                return None;
+            }
+            if !name.chars().all(is_valid_cookie_char)
+                || !value.chars().all(is_valid_cookie_char)
+            {
+                tracing::warn!("已跳过包含控制字符的 cookie 项: {}", name);
+                return None;
+            }
             Some(crate::models::account::StoredCookie {
-                name: name.trim().to_string(),
-                value: value.trim().to_string(),
+                name: name.to_string(),
+                value: value.to_string(),
                 domain: ".chaoxing.com".to_string(),
                 path: "/".to_string(),
             })
         })
         .collect::<Vec<_>>();
+
+    if cookies.is_empty() {
+        return Err(AppError::Other("未解析到任何有效 cookie".to_string()));
+    }
 
     client.import_cookies(&cookies).map_err(AppError::Other)?;
 

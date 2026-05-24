@@ -234,7 +234,12 @@ fn get_glyph_offset_range(
     let (start, end) = if index_to_loc_format == 0 {
         // 短格式：每个条目 2 字节
         let idx = glyph_id as usize;
-        if loca_data.len() < (idx + 2) * 2 {
+        // 使用 checked_add / checked_mul 避免 usize 算术溢出 panic
+        let need = idx
+            .checked_add(2)
+            .and_then(|v| v.checked_mul(2));
+        let Some(need) = need else { return None };
+        if loca_data.len() < need {
             return None;
         }
         let s = u16::from_be_bytes([
@@ -251,7 +256,11 @@ fn get_glyph_offset_range(
     } else {
         // 长格式：每个条目 4 字节
         let idx = glyph_id as usize;
-        if loca_data.len() < (idx + 2) * 4 {
+        let need = idx
+            .checked_add(2)
+            .and_then(|v| v.checked_mul(4));
+        let Some(need) = need else { return None };
+        if loca_data.len() < need {
             return None;
         }
         let s = u32::from_be_bytes([

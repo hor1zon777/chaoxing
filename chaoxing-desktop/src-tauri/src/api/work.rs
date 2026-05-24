@@ -46,8 +46,12 @@ pub async fn study_work(
         return Ok(StudyResult::Success);
     }
 
-    // 获取题目页面 HTML
-    let work_id = job.jobid.replace("work-", "");
+    // 获取题目页面 HTML —— 仅剥离一次前缀，避免 jobid 含内嵌 "work-" 子串被误删
+    let work_id = job
+        .jobid
+        .strip_prefix("work-")
+        .unwrap_or(&job.jobid)
+        .to_string();
     let questions_data = fetch_questions(
         client, course_id, clazz_id, &work_id, &job.jobid, job_info, &job.enc,
     )

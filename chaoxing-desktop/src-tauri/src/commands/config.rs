@@ -97,6 +97,16 @@ pub async fn import_ini(
     if let Some(v) = ini.get("common", "notopen_action") {
         config.notopen_action = v;
     }
+    if let Some(v) = ini.get("common", "tasks_per_chapter") {
+        if let Ok(parsed) = v.parse::<u32>() {
+            config.tasks_per_chapter = parsed.clamp(1, 8);
+        }
+    }
+    if let Some(v) = ini.get("common", "chapters_per_course") {
+        if let Ok(parsed) = v.parse::<u32>() {
+            config.chapters_per_course = parsed.clamp(1, 8);
+        }
+    }
 
     // [tiku] section
     if let Some(v) = ini.get("tiku", "provider") {

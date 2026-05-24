@@ -164,15 +164,24 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   fetchSavedAccounts: async () => {
-    set({ isLoading: true, error: null });
+    // 与 login/validateSession 共用 authVersion 序列：晚到的并发请求
+    // 在版本号被更新后丢弃，避免空列表覆盖刚获取的最新结果
+    const nextVersion = useAuthStore.getState().authVersion + 1;
+    set({ isLoading: true, error: null, authVersion: nextVersion });
     try {
       const savedAccounts = await invoke<SavedAccountSummary[]>("list_saved_accounts");
+      if (useAuthStore.getState().authVersion !== nextVersion) {
+        return;
+      }
       set({
         savedAccounts,
         isLoading: false,
         hasInitialized: true,
       });
     } catch (err) {
+      if (useAuthStore.getState().authVersion !== nextVersion) {
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       set({
         savedAccounts: [],

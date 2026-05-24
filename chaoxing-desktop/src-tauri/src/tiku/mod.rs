@@ -12,6 +12,7 @@ pub mod like;
 pub mod siliconflow;
 pub mod yanxi;
 
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use regex::Regex;
@@ -22,6 +23,23 @@ use crate::models::config::AppConfig;
 /// 缓存编译后的正则
 static RE_NUM_PREFIX: OnceLock<Regex> = OnceLock::new();
 static RE_SCORE_SUFFIX: OnceLock<Regex> = OnceLock::new();
+
+/// 题库缓存基目录（由 lib.rs setup 时通过 AppHandle.path() 注入），
+/// 未注入时回退到环境变量 / 临时目录，确保与 config.json 同一数据根
+static TIKU_CACHE_BASE: OnceLock<PathBuf> = OnceLock::new();
+
+/// 由 lib.rs 在 setup 阶段调用，使题库缓存路径与 config.json 同根
+pub fn set_cache_base_dir(path: PathBuf) {
+    let _ = TIKU_CACHE_BASE.set(path);
+}
+
+fn default_cache_base_dir() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("chaoxing-desktop")
+}
 
 fn re_num_prefix() -> &'static Regex {
     RE_NUM_PREFIX.get_or_init(|| Regex::new(r"^\d+").unwrap())
@@ -184,12 +202,12 @@ impl TikuManager {
             .filter(|s| !s.is_empty())
             .collect();
 
-        // 缓存文件放在用户数据目录（避免使用 current_exe 路径，可能为只读的 Program Files）
-        let cache_path = std::env::var_os("LOCALAPPDATA")
-            .or_else(|| std::env::var_os("HOME"))
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir)
-            .join("chaoxing-desktop")
+        // 缓存文件优先使用 lib.rs setup 注入的 AppHandle 配置目录，
+        // 与 config.json 保持同一数据根；未注入时回退到 LOCALAPPDATA / HOME
+        let cache_path = TIKU_CACHE_BASE
+            .get()
+            .cloned()
+            .unwrap_or_else(default_cache_base_dir)
             .join("cache.json");
 
         Self {

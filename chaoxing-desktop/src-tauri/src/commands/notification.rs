@@ -3,19 +3,24 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::models::config::AppConfig;
 use crate::notification::NotificationProvider;
 use crate::state::AppState;
 
 /// 发送测试通知
 #[tauri::command]
 pub async fn test_notification(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     provider: String,
     url: String,
     tg_chat_id: String,
 ) -> Result<bool, AppError> {
-    let mut config = AppConfig::default();
+    // 基于当前持久配置克隆出测试副本，只覆盖通知三字段；
+    // 避免用 AppConfig::default() 把 speed / jobs / 题库等其他字段清零，
+    // 防止某些 provider 校验出口依赖其他默认值差异
+    let mut config = {
+        let snapshot = state.config.read().await;
+        snapshot.clone()
+    };
     config.notification_provider = provider;
     config.notification_url = url;
     config.notification_tg_chat_id = tg_chat_id;

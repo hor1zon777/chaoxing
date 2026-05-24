@@ -98,6 +98,10 @@ impl HttpClient {
     }
 
     /// 从 cookie store 获取指定 cookie 的值
+    ///
+    /// domain 匹配规则：cookie 的 domain 必须等于 `domain`、
+    /// 等于 `.domain`，或以 `.domain` 结尾（subdomain match）。
+    /// 用 `contains` 会把 "evil.chaoxing.com.attacker.io" 这种子串误判，故收紧。
     pub fn get_cookie(&self, name: &str, domain: &str) -> Option<String> {
         let store = match self.cookie_store.lock() {
             Ok(s) => s,
@@ -106,8 +110,16 @@ impl HttpClient {
                 poisoned.into_inner()
             }
         };
+        let target = domain.trim_start_matches('.');
         for cookie in store.iter_unexpired() {
-            if cookie.name() == name && cookie.domain().map_or(false, |d| d.contains(domain)) {
+            if cookie.name() != name {
+                continue;
+            }
+            let Some(d) = cookie.domain() else {
+                continue;
+            };
+            let d = d.trim_start_matches('.');
+            if d == target || d.ends_with(&format!(".{}", target)) {
                 return Some(cookie.value().to_string());
             }
         }

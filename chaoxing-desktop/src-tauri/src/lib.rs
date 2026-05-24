@@ -43,6 +43,8 @@ pub fn run() {
             // 这里用 async_runtime::block_on 在同步 setup 中安全获取异步锁
             let state = app.state::<AppState>();
             let config_dir = app.path().app_config_dir().unwrap_or_default();
+            // 题库缓存与 config.json 同根，避免落到 LOCALAPPDATA / HOME 不同位置
+            crate::tiku::set_cache_base_dir(config_dir.clone());
             let config_path = config_dir.join("config.json");
             if config_path.exists() {
                 match std::fs::read_to_string(&config_path) {

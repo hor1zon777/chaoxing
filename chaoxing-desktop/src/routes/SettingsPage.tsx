@@ -103,10 +103,12 @@ export function SettingsPage() {
 
   const handleSave = async () => {
     try {
-      const values = await form.validateFields();
-      // 合并：以现有 config 为基底，仅覆盖表单当前注册的字段
-      // 避免因 Tab 条件渲染导致未注册字段被 serde 默认值覆盖
-      const merged: AppConfig = { ...config, ...values };
+      // 先校验当前 Tab 注册字段
+      await form.validateFields();
+      // 取 ALL 字段（getFieldsValue(true) 包含 antd Form preserve=true 保留的
+      // 已切走 Tab 中的字段值），避免"在 A Tab 改后切到 B Tab 保存"丢失 A 的修改
+      const allValues = form.getFieldsValue(true);
+      const merged: AppConfig = { ...config, ...allValues };
       await saveConfig(merged);
       msgApi.success("配置已保存");
     } catch {

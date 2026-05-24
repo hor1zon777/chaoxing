@@ -105,18 +105,21 @@ pub async fn start_course_tasks(
         });
     }
 
-    let config = state.config.read().await;
-    let tiku = TikuManager::from_config(&config);
-    let tasks_per_chapter = config.tasks_per_chapter.clamp(1, 8);
-    let chapters_per_course = config.chapters_per_course.clamp(1, 8);
-    drop(config);
+    // 一次性快照配置，避免多次 read 期间被 save_config 改写造成读到的字段不一致
+    let (tiku, tasks_per_chapter, chapters_per_course, check_llm_connection) = {
+        let config = state.config.read().await;
+        (
+            TikuManager::from_config(&config),
+            config.tasks_per_chapter.clamp(1, 8),
+            config.chapters_per_course.clamp(1, 8),
+            config.check_llm_connection,
+        )
+    };
 
     tiku.init().await;
 
-    let config_check = state.config.read().await;
     let mut tiku_disabled_by_check = false;
-    if config_check.check_llm_connection && !tiku.disabled {
-        drop(config_check);
+    if check_llm_connection && !tiku.disabled {
         if !tiku.check_connection().await {
             tiku_disabled_by_check = true;
             let _ = tx.send(TaskEvent::Log {
@@ -125,8 +128,6 @@ pub async fn start_course_tasks(
                 timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
             });
         }
-    } else {
-        drop(config_check);
     }
 
     let tiku_ref = if tiku.disabled || tiku_disabled_by_check { None } else { Some(Arc::new(tiku)) };
@@ -198,7 +199,7 @@ pub async fn start_course_tasks(
                         course_title: course.title.clone(),
                         error: e.to_string(),
                     });
-                    is_running.store(false, Ordering::SeqCst);
+                    // 单课失败不应连带取消整批任务；仅本课程退出
                     return Err(e);
                 }
             };
@@ -245,7 +246,7 @@ pub async fn start_course_tasks(
                     course_title: course.title.clone(),
                     error: e.to_string(),
                 });
-                is_running.store(false, Ordering::SeqCst);
+                // 单课失败不应连带取消整批任务；仅本课程退出
                 return Err(e);
             }
 

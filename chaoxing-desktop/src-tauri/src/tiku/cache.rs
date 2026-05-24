@@ -59,17 +59,19 @@ impl CacheDAO {
             cache.insert(question.to_string(), answer.to_string());
             cache.clone()
         };
-        // 在写锁释放后再执行阻塞 I/O，避免阻塞其他并发读取
-        self.save_to_file(&snapshot);
+        // 通过 spawn_blocking 把同步 I/O 移出 async worker，避免阻塞 tokio runtime
+        let path = self.file_path.clone();
+        let _ = tokio::task::spawn_blocking(move || Self::save_to_file_blocking(&path, &snapshot))
+            .await;
     }
 
-    /// 原子写入缓存文件
+    /// 原子写入缓存文件（同步实现，需在 spawn_blocking 中调用）
     ///
     /// 对应 Python CacheDAO._write_cache() 的原子写入策略：
     /// 先写临时文件，再 rename 替换。
-    fn save_to_file(&self, cache: &HashMap<String, String>) {
+    fn save_to_file_blocking(file_path: &PathBuf, cache: &HashMap<String, String>) {
         // 确保父目录存在
-        if let Some(parent) = self.file_path.parent() {
+        if let Some(parent) = file_path.parent() {
             if !parent.exists() {
                 if let Err(e) = std::fs::create_dir_all(parent) {
                     tracing::error!("创建缓存目录失败: {}", e);
@@ -80,10 +82,10 @@ impl CacheDAO {
 
         match serde_json::to_string_pretty(cache) {
             Ok(content) => {
-                let tmp_path = self.file_path.with_extension("tmp");
+                let tmp_path = file_path.with_extension("tmp");
                 match std::fs::write(&tmp_path, &content) {
                     Ok(()) => {
-                        if let Err(e) = std::fs::rename(&tmp_path, &self.file_path) {
+                        if let Err(e) = std::fs::rename(&tmp_path, file_path) {
                             tracing::error!("重命名缓存临时文件失败: {}", e);
                             // 清理临时文件
                             let _ = std::fs::remove_file(&tmp_path);

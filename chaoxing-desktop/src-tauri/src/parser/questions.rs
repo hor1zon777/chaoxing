@@ -88,13 +88,18 @@ pub fn parse_questions_info(
         }
     }
 
-    // 生成 answerwqbid
-    let answerwqbid = questions
-        .iter()
-        .map(|q| q.id.as_str())
-        .collect::<Vec<_>>()
-        .join(",")
-        + ",";
+    // 生成 answerwqbid：空 questions 时返回空字符串，
+    // 避免下游把单独的 "," 误解析为 1 个空 ID
+    let answerwqbid = if questions.is_empty() {
+        String::new()
+    } else {
+        questions
+            .iter()
+            .map(|q| q.id.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+            + ","
+    };
 
     Ok(QuestionsFormData {
         form_fields,

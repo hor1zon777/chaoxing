@@ -181,6 +181,10 @@ function buildFlatJobs(tree: CourseSelectionTree | undefined): FlatCourseJob[] {
   );
 }
 
+// 模块级 in-flight Promise 表：避免对同一课程的重复 fetch_course_selection_tree 调用
+// 第二次点击同卡片直接复用第一次的 Promise，不会再触发"加载失败"
+const inflightTreeRequests = new Map<string, Promise<CourseSelectionTree | null>>();
+
 export const useCourseStore = create<CourseState>((set, get) => ({
   courses: [],
   selectedCourseIds: [],
@@ -204,37 +208,52 @@ export const useCourseStore = create<CourseState>((set, get) => ({
   },
 
   fetchCourseTree: async (course) => {
-    const { courseTrees, treeLoadingIds } = get();
+    const { courseTrees } = get();
     if (courseTrees[course.id]) {
       return courseTrees[course.id];
     }
-    if (treeLoadingIds.includes(course.id)) {
-      return null;
+    // 复用 in-flight Promise，避免重复点击触发并发 fetch 且不返回 null
+    const existing = inflightTreeRequests.get(course.id);
+    if (existing) {
+      return existing;
     }
 
-    set({ treeLoadingIds: [...treeLoadingIds, course.id], error: null });
-    try {
-      const tree = await invoke<CourseSelectionTree>("get_course_selection_tree", {
-        courseId: course.courseId,
-        clazzId: course.clazzId,
-        cpi: course.cpi,
-      });
-      set((state) => ({
-        courseTrees: {
-          ...state.courseTrees,
-          [course.id]: tree,
-        },
-        treeLoadingIds: state.treeLoadingIds.filter((id) => id !== course.id),
-      }));
-      return tree;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set((state) => ({
-        treeLoadingIds: state.treeLoadingIds.filter((id) => id !== course.id),
-        error: message,
-      }));
-      return null;
-    }
+    set((state) => ({
+      treeLoadingIds: state.treeLoadingIds.includes(course.id)
+        ? state.treeLoadingIds
+        : [...state.treeLoadingIds, course.id],
+      error: null,
+    }));
+
+    const request = (async (): Promise<CourseSelectionTree | null> => {
+      try {
+        const tree = await invoke<CourseSelectionTree>("get_course_selection_tree", {
+          courseId: course.courseId,
+          clazzId: course.clazzId,
+          cpi: course.cpi,
+        });
+        set((state) => ({
+          courseTrees: {
+            ...state.courseTrees,
+            [course.id]: tree,
+          },
+          treeLoadingIds: state.treeLoadingIds.filter((id) => id !== course.id),
+        }));
+        return tree;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set((state) => ({
+          treeLoadingIds: state.treeLoadingIds.filter((id) => id !== course.id),
+          error: message,
+        }));
+        return null;
+      } finally {
+        inflightTreeRequests.delete(course.id);
+      }
+    })();
+
+    inflightTreeRequests.set(course.id, request);
+    return request;
   },
 
   activateCourse: async (course) => {

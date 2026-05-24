@@ -40,21 +40,20 @@ export function CourseTaskSelectPage() {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
   const [selectedJobTypes, setSelectedJobTypes] = useState<JobType[]>([]);
-  const {
-    courses,
-    courseTrees,
-    treeLoadingIds,
-    learningSelections,
-    isLoading: coursesLoading,
-    error,
-    activateCourse,
-    fetchCourses,
-    selectJobsByType,
-    selectAllJobsForCourse,
-    batchUpdateJobsForCourse,
-    toggleJobSelection,
-    getFlatJobsForCourse,
-  } = useCourseStore();
+  // 使用细粒度 selector，避免对全 store 解构导致任一字段变化都 rerender
+  const courses = useCourseStore((s) => s.courses);
+  const courseTrees = useCourseStore((s) => s.courseTrees);
+  const treeLoadingIds = useCourseStore((s) => s.treeLoadingIds);
+  const learningSelections = useCourseStore((s) => s.learningSelections);
+  const coursesLoading = useCourseStore((s) => s.isLoading);
+  const error = useCourseStore((s) => s.error);
+  const activateCourse = useCourseStore((s) => s.activateCourse);
+  const fetchCourses = useCourseStore((s) => s.fetchCourses);
+  const selectJobsByType = useCourseStore((s) => s.selectJobsByType);
+  const selectAllJobsForCourse = useCourseStore((s) => s.selectAllJobsForCourse);
+  const batchUpdateJobsForCourse = useCourseStore((s) => s.batchUpdateJobsForCourse);
+  const toggleJobSelection = useCourseStore((s) => s.toggleJobSelection);
+  const getFlatJobsForCourse = useCourseStore((s) => s.getFlatJobsForCourse);
 
   const course = useMemo(
     () => courses.find((item) => item.id === courseId),

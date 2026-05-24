@@ -92,11 +92,45 @@ pub async fn run_live(
             });
         }
 
-        let success = live::submit_live_time(client, job, course_id, &user_id).await?;
+        // 第一次提交：失败不立即抛错，先等待 5s 重试一次再放弃
+        let first = live::submit_live_time(client, job, course_id, &user_id).await;
+        let success = match first {
+            Ok(true) => true,
+            Ok(false) => {
+                tracing::warn!("第 {} 分钟时长提交失败，5s 后重试", i + 1);
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                match live::submit_live_time(client, job, course_id, &user_id).await {
+                    Ok(ok) => {
+                        if !ok {
+                            tracing::warn!("第 {} 分钟时长重试仍失败", i + 1);
+                        }
+                        ok
+                    }
+                    Err(e) => {
+                        tracing::warn!("第 {} 分钟时长重试异常: {}", i + 1, e);
+                        false
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("第 {} 分钟时长提交异常: {}，5s 后重试", i + 1, e);
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                match live::submit_live_time(client, job, course_id, &user_id).await {
+                    Ok(ok) => {
+                        if !ok {
+                            tracing::warn!("第 {} 分钟时长重试仍失败", i + 1);
+                        }
+                        ok
+                    }
+                    Err(e2) => {
+                        tracing::warn!("第 {} 分钟时长重试异常: {}", i + 1, e2);
+                        false
+                    }
+                }
+            }
+        };
         if !success {
-            tracing::warn!("第 {} 分钟时长提交失败，将重试", i + 1);
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            let _ = live::submit_live_time(client, job, course_id, &user_id).await;
+            tracing::warn!("直播 '{}' 第 {} 分钟时长未能成功提交", live_name, i + 1);
         }
 
         // 根据倍速调整间隔 (59 / speed 秒)
