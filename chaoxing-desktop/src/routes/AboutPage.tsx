@@ -6,7 +6,7 @@ import { Card, Eyebrow, Headline, PillButton, Subtitle, Tag } from "../component
 const REPO_URL = "https://github.com/hor1zon777/chaoxing";
 const UPSTREAM_REPO_URL = "https://github.com/Samueli924/chaoxing";
 const LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html";
-const APP_VERSION = "v0.1.7";
+const APP_VERSION = "v0.1.8";
 
 /** 关于页：作者、仓库、协议、免责声明 */
 export function AboutPage() {
