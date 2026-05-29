@@ -4,5 +4,6 @@ pub mod config;
 pub mod course;
 pub mod events;
 pub mod job;
+pub mod topic;
 pub mod video;
 pub mod work;

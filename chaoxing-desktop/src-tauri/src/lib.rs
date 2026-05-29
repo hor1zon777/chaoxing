@@ -98,6 +98,9 @@ pub fn run() {
             commands::config::load_config,
             commands::config::import_ini,
             commands::tiku::test_tiku_connection,
+            commands::topic::send_topic,
+            commands::topic::list_course_topics,
+            commands::topic::list_my_topics,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用失败");

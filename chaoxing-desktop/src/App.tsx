@@ -7,6 +7,7 @@ import { AppLayout } from "./components/Layout/AppLayout";
 import { LoginPage } from "./routes/LoginPage";
 import { CoursesPage } from "./routes/CoursesPage";
 import { CourseTaskSelectPage } from "./routes/CourseTaskSelectPage";
+import { CourseTopicsPage } from "./routes/CourseTopicsPage";
 import { TaskPage } from "./routes/TaskPage";
 import { SettingsPage } from "./routes/SettingsPage";
 import { AboutPage } from "./routes/AboutPage";
@@ -221,6 +222,7 @@ function App() {
             <Route index element={<Navigate to="/courses" replace />} />
             <Route path="courses" element={<CoursesPage />} />
             <Route path="courses/:courseId/tasks" element={<CourseTaskSelectPage />} />
+            <Route path="courses/:courseId/topics" element={<CourseTopicsPage />} />
             <Route path="tasks" element={<TaskPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="about" element={<AboutPage />} />

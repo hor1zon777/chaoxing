@@ -21,6 +21,9 @@ function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith("/courses/") && pathname.endsWith("/tasks")) {
     return { title: "任务配置", description: "按类型筛选并勾选学习范围" };
   }
+  if (pathname.startsWith("/courses/") && pathname.endsWith("/topics")) {
+    return { title: "课程讨论", description: "查看话题并发布讨论" };
+  }
   if (pathname.startsWith("/courses")) {
     return { title: "课程" };
   }

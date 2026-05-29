@@ -10,3 +10,4 @@ pub mod empty_page;
 pub mod live;
 pub mod captcha;
 pub mod work;
+pub mod topic;

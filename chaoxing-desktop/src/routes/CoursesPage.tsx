@@ -341,6 +341,7 @@ export function CoursesPage() {
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
+                            gap: 8,
                           }}
                         >
                           <span
@@ -353,17 +354,49 @@ export function CoursesPage() {
                           >
                             {course.courseId}
                           </span>
-                          <span
-                            style={{
-                              fontFamily: "var(--apple-font-text)",
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: "var(--apple-color-primary)",
-                              letterSpacing: "-0.224px",
-                            }}
-                          >
-                            {isActivating ? "加载中…" : "进入配置 →"}
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                navigate(`/courses/${course.id}/topics`);
+                              }}
+                              onKeyDown={(event) => {
+                                // 阻止 Enter/Space 冒泡到整卡 onKeyDown，否则会误触发跳转任务配置页
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.stopPropagation();
+                                }
+                              }}
+                              aria-label={`进入「${course.title}」讨论区`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                background: "rgba(0, 102, 204, 0.08)",
+                                color: "var(--apple-color-primary)",
+                                border: "none",
+                                borderRadius: 9999,
+                                padding: "4px 12px",
+                                fontFamily: "var(--apple-font-text)",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                letterSpacing: "-0.12px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              讨论
+                            </button>
+                            <span
+                              style={{
+                                fontFamily: "var(--apple-font-text)",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "var(--apple-color-primary)",
+                                letterSpacing: "-0.224px",
+                              }}
+                            >
+                              {isActivating ? "加载中…" : "进入配置 →"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </Card>

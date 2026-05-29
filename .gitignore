@@ -173,3 +173,7 @@ Thumbs.db
 .claude
 
 chaoxing-desktop/apple
+
+# 抓包文件与逆向样本（仅本地分析用，不入库）
+*.har
+*.apk

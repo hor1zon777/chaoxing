@@ -134,9 +134,12 @@ export function CourseTaskSelectPage() {
       <div style={{ background: "var(--apple-color-canvas)", minHeight: "100%" }}>
         <section style={{ padding: "48px 22px 24px" }}>
           <div style={{ maxWidth: 1024, margin: "0 auto" }}>
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 12 }}>
               <UtilityButton light onClick={() => navigate("/courses")}>
                 ← 返回课程列表
+              </UtilityButton>
+              <UtilityButton light onClick={() => navigate(`/courses/${courseId}/topics`)}>
+                讨论区 →
               </UtilityButton>
             </div>
             <Eyebrow>任务配置</Eyebrow>
@@ -187,9 +190,12 @@ export function CourseTaskSelectPage() {
       {/* Hero */}
       <section style={{ padding: "48px 22px 24px" }}>
         <div style={{ maxWidth: 1024, margin: "0 auto" }}>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 12 }}>
             <UtilityButton light onClick={() => navigate("/courses")}>
               ← 返回课程列表
+            </UtilityButton>
+            <UtilityButton light onClick={() => navigate(`/courses/${courseId}/topics`)}>
+              讨论区 →
             </UtilityButton>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
